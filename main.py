@@ -8,6 +8,8 @@
 from apex import amp
 from apex.parallel import DistributedDataParallel as DDP
 import apex
+from summary.cfsummary import CompletionFormerSummary
+from metric.cfmetric import CompletionFormerMetric
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import cv2
@@ -307,17 +309,18 @@ def train(gpu, args):
 
 def test(args):
     # Prepare dataset
-    data = get_data(args)
+    # data = get_data(args)
 
-    data_test = data(args, 'test')
+    data_test = HammerDataset(args, "test")
 
-    loader_test = DataLoader(dataset=data_test, batch_size=args.batch_size,
+    loader_test = DataLoader(dataset=data_test, batch_size=1,
                              shuffle=False, num_workers=args.num_threads)
 
     # Network
-    net = PDNE(args)
-
-    # device = torch.device("cuda:{}".format(device_ids[0]) if torch.cuda.is_available() else "cpu")
+    if args.model == 'CompletionFormer':
+        net = CompletionFormer(args)
+    else:
+        raise TypeError(args.model, ['CompletionFormer',])
     net.cuda()
 
     if args.pretrain is not None:
@@ -325,13 +328,21 @@ def test(args):
             "file not found: {}".format(args.pretrain)
 
         checkpoint = torch.load(args.pretrain)
-        print('Start epoch:', checkpoint['epoch'])
-        net.load_state_dict(checkpoint['net'], strict=False)
+        key_m, key_u = net.load_state_dict(checkpoint['net'], strict=False)
+
+        if key_u:
+            print('Unexpected keys :')
+            print(key_u)
+
+        if key_m:
+            print('Missing keys :')
+            print(key_m)
+            raise KeyError
         print('Checkpoint loaded from {}!'.format(args.pretrain))
 
     net = nn.DataParallel(net)
 
-    metric = PDNEMetric(args)
+    metric = CompletionFormerMetric(args)
 
     try:
         os.makedirs(args.save_dir, exist_ok=True)
@@ -339,8 +350,7 @@ def test(args):
     except OSError:
         pass
 
-    total_metrics = np.zeros(np.array(metric.metric_name).shape)
-    total_metrics_missing = np.zeros(np.array(metric.metric_name).shape)
+    writer_test = CompletionFormerSummary(args.save_dir, 'test', args, None, metric.metric_name)
 
     net.eval()
 
@@ -352,48 +362,23 @@ def test(args):
 
     init_seed()
     for batch, sample in enumerate(loader_test):
-        base_name = sample['base_name']
         sample = {key: val.cuda() for key, val in sample.items()
-                  if (val is not None) and key != 'base_name'}
-        sample['base_name'] = base_name
-
-        if args.mode == 'pd':
-            image_coordinate = sample['coordinate']
-            viewing_direction = sample['vd']
-            aop = sample['input'][:, 5:6, ...]
-            net_in = get_net_input_cuda(
-                sample['input'], image_coordinate, viewing_direction, args)
-            sample['input'] = net_in
-        else: aop=None
+                  if val is not None}
 
         t0 = time.time()
         with torch.no_grad():
             output = net(sample)
         t1 = time.time()
 
-        # vis the output
-
-        if args.mode == 'pd' or 'grayd':
-            sparse_type = args.sparse_dir.split('spw2_sparse_')[1]
-
-            if args.polar:
-                input_type = 'polar'
-            else:
-                input_type = 'gray'
-            save_dir = os.path.join(args.save_dir, args.vis_dir)
-            save_output(sample, output, aop, save_dir, input_type, sparse_type, args.with_norm)
-
         t_total += (t1 - t0)
 
-        # print(output['pred'].shape)
         metric_val = metric.evaluate(sample, output, 'test')
-        # print(metric_val[0])
-        metric_val_missing = metric.evaluate(sample, output, 'on_missing')
 
-        total_metrics = np.add(total_metrics, metric_val[0].detach().cpu())
+        writer_test.add(None, metric_val)
 
-        total_metrics_missing = np.add(
-            total_metrics_missing, metric_val_missing[0].detach().cpu())
+        # Save data for analysis
+        if args.save_image:
+            writer_test.save(args.epochs, batch, sample, output)
 
         current_time = time.strftime('%y%m%d@%H:%M:%S')
         error_str = '{} | Test'.format(current_time)
@@ -402,21 +387,124 @@ def test(args):
             pbar.update(loader_test.batch_size)
 
     pbar.close()
-    mean_metrics = np.divide(total_metrics, len(loader_test))
-    mean_metrics_missing = np.divide(total_metrics_missing, len(loader_test))
-    metrics_dict = {}
-    metrics_dict_missing = {}
 
-    for i in range(len(mean_metrics)):
-        name = metric.metric_name[i]
-        metrics_dict[name] = mean_metrics[i]
-        metrics_dict_missing[name] = mean_metrics_missing[i]
+    writer_test.update(args.epochs, sample, output)
 
-    # writer_test.update(args.epochs, sample, output)
-    return metrics_dict, metrics_dict_missing
-    # t_avg = t_total / num_sample
-    # print('Elapsed time : {} sec, '
-    #       'Average processing time : {} sec'.format(t_total, t_avg))
+    t_avg = t_total / num_sample
+    print('Elapsed time : {} sec, '
+          'Average processing time : {} sec'.format(t_total, t_avg))
+
+    # # Prepare dataset
+    # data = get_data(args)
+
+    # data_test = data(args, 'test')
+
+    # loader_test = DataLoader(dataset=data_test, batch_size=args.batch_size,
+    #                          shuffle=False, num_workers=args.num_threads)
+
+    # # Network
+    # net = PDNE(args)
+
+    # # device = torch.device("cuda:{}".format(device_ids[0]) if torch.cuda.is_available() else "cpu")
+    # net.cuda()
+
+    # if args.pretrain is not None:
+    #     assert os.path.exists(args.pretrain), \
+    #         "file not found: {}".format(args.pretrain)
+
+    #     checkpoint = torch.load(args.pretrain)
+    #     print('Start epoch:', checkpoint['epoch'])
+    #     net.load_state_dict(checkpoint['net'], strict=False)
+    #     print('Checkpoint loaded from {}!'.format(args.pretrain))
+
+    # net = nn.DataParallel(net)
+
+    # metric = PDNEMetric(args)
+
+    # try:
+    #     os.makedirs(args.save_dir, exist_ok=True)
+    #     os.makedirs(args.save_dir + '/test', exist_ok=True)
+    # except OSError:
+    #     pass
+
+    # total_metrics = np.zeros(np.array(metric.metric_name).shape)
+    # total_metrics_missing = np.zeros(np.array(metric.metric_name).shape)
+
+    # net.eval()
+
+    # num_sample = len(loader_test)*loader_test.batch_size
+
+    # pbar = tqdm(total=num_sample)
+
+    # t_total = 0
+
+    # init_seed()
+    # for batch, sample in enumerate(loader_test):
+    #     base_name = sample['base_name']
+    #     sample = {key: val.cuda() for key, val in sample.items()
+    #               if (val is not None) and key != 'base_name'}
+    #     sample['base_name'] = base_name
+
+    #     if args.mode == 'pd':
+    #         image_coordinate = sample['coordinate']
+    #         viewing_direction = sample['vd']
+    #         aop = sample['input'][:, 5:6, ...]
+    #         net_in = get_net_input_cuda(
+    #             sample['input'], image_coordinate, viewing_direction, args)
+    #         sample['input'] = net_in
+    #     else: aop=None
+
+    #     t0 = time.time()
+    #     with torch.no_grad():
+    #         output = net(sample)
+    #     t1 = time.time()
+
+    #     # vis the output
+
+    #     if args.mode == 'pd' or 'grayd':
+    #         sparse_type = args.sparse_dir.split('spw2_sparse_')[1]
+
+    #         if args.polar:
+    #             input_type = 'polar'
+    #         else:
+    #             input_type = 'gray'
+    #         save_dir = os.path.join(args.save_dir, args.vis_dir)
+    #         save_output(sample, output, aop, save_dir, input_type, sparse_type, args.with_norm)
+
+    #     t_total += (t1 - t0)
+
+    #     # print(output['pred'].shape)
+    #     metric_val = metric.evaluate(sample, output, 'test')
+    #     # print(metric_val[0])
+    #     metric_val_missing = metric.evaluate(sample, output, 'on_missing')
+
+    #     total_metrics = np.add(total_metrics, metric_val[0].detach().cpu())
+
+    #     total_metrics_missing = np.add(
+    #         total_metrics_missing, metric_val_missing[0].detach().cpu())
+
+    #     current_time = time.strftime('%y%m%d@%H:%M:%S')
+    #     error_str = '{} | Test'.format(current_time)
+    #     if batch % args.print_freq == 0:
+    #         pbar.set_description(error_str)
+    #         pbar.update(loader_test.batch_size)
+
+    # pbar.close()
+    # mean_metrics = np.divide(total_metrics, len(loader_test))
+    # mean_metrics_missing = np.divide(total_metrics_missing, len(loader_test))
+    # metrics_dict = {}
+    # metrics_dict_missing = {}
+
+    # for i in range(len(mean_metrics)):
+    #     name = metric.metric_name[i]
+    #     metrics_dict[name] = mean_metrics[i]
+    #     metrics_dict_missing[name] = mean_metrics_missing[i]
+
+    # # writer_test.update(args.epochs, sample, output)
+    # return metrics_dict, metrics_dict_missing
+    # # t_avg = t_total / num_sample
+    # # print('Elapsed time : {} sec, '
+    # #       'Average processing time : {} sec'.format(t_total, t_avg))
 
 
 def main(args):
@@ -444,25 +532,28 @@ def main(args):
         # test_sparsity_list = ['spw2_sparse_ranged_tof', 'spw2_sparse_ranged_feature',
         #                     'spw2_sparse_ranged_random', 'spw2_sparse_holes', 'spw2_sparse_ranged_fov']
         # test_sparsity_list = ['spw2_sparse_tof']
-        test_sparsity_list = [args.sparse_dir]
-        os.makedirs(args.save_dir, exist_ok=True)
-        result = open(os.path.join(args.save_dir, 'test_result.txt'), 'w+')
-        if args.mixed:
-            args.mixed = False
-        for i in test_sparsity_list:
-            args.sparse_dir = i
-            args.vis_dir = 'vis_'+i.split('spw2_sparse_')[1]
-            metric_dict, metric_dict_missing = test(args)
-            if args.polar:
-                mode = 'polar'
-            else:
-                mode = 'gray'
-            result.writelines(i+' '+mode+'\n')
 
-            for i in metric_dict.keys():
-                current_str = f'{i}: {metric_dict[i]}    {i}_on_missing: {metric_dict_missing[i]}'+'\n'
-                result.writelines(current_str)
-        result.close()
+        test(args)
+
+        # test_sparsity_list = [args.sparse_dir]
+        # os.makedirs(args.save_dir, exist_ok=True)
+        # result = open(os.path.join(args.save_dir, 'test_result.txt'), 'w+')
+        # if args.mixed:
+        #     args.mixed = False
+        # for i in test_sparsity_list:
+        #     args.sparse_dir = i
+        #     args.vis_dir = 'vis_'+i.split('spw2_sparse_')[1]
+        #     metric_dict, metric_dict_missing = test(args)
+        #     if args.polar:
+        #         mode = 'polar'
+        #     else:
+        #         mode = 'gray'
+        #     result.writelines(i+' '+mode+'\n')
+
+        #     for i in metric_dict.keys():
+        #         current_str = f'{i}: {metric_dict[i]}    {i}_on_missing: {metric_dict_missing[i]}'+'\n'
+        #         result.writelines(current_str)
+        # result.close()
 
 
 if __name__ == '__main__':
