@@ -35,6 +35,10 @@ import os
 from model.completionformer_original.completionformer import CompletionFormer
 from model.completionformer_vpt_v1.completionformer_vpt_v1 import CompletionFormerVPTV1
 from model.completionformer_polar_cat.completionformer import CompletionFormerPolarCat
+from model.completionformer_vpt_v2.completionformer_vpt_v2 import CompletionFormerVPTV2
+from model.completionformer_vpt_v2.completionformer_vpt_v2_1 import CompletionFormerVPTV2_1
+from summary.cfsummary import CompletionFormerSummary
+from metric.cfmetric import CompletionFormerMetric
 os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
 os.environ["MASTER_ADDR"] = args_config.address
 os.environ["MASTER_PORT"] = args_config.port
@@ -85,7 +89,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10002',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10001',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -106,6 +110,12 @@ def train(gpu, args):
     # Network
     if args.model == 'CompletionFormer':
         net = CompletionFormer(args)
+    elif args.model == 'CompletionFormerFreezed':
+        net = CompletionFormer(args)
+        if args.pretrained_completionformer is not None:
+            net.load_state_dict(torch.load(args.pretrained_completionformer)['net'])
+            for p in net.parameters():
+                p.requires_grad = False
     elif args.model == 'PDNE':
         net = PDNE(args)
     elif args.model == 'VPT-V1':
@@ -114,6 +124,8 @@ def train(gpu, args):
         net = CompletionFormerPolarCat(args)
     elif args.model == 'FFT':
         pass
+    elif args.model == 'VPT-V2':
+        net = CompletionFormerVPTV2_1(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'FFT', 'POLAR-CAT'])
 
@@ -206,6 +218,8 @@ def train(gpu, args):
                       if (val is not None) and key != 'base_name'}
 
             sample["input"] = sample["rgb"]
+            # print("--> Dep max {} min {}".format(torch.max(sample['dep']), torch.min(sample['dep'])))
+            # print("--> Rgb max {} min {}".format(torch.max(sample['rgb']), torch.min(sample['rgb'])))
 
             if epoch == 1 and args.warm_up:
                 warm_up_cnt += 1
@@ -217,11 +231,12 @@ def train(gpu, args):
 
             optimizer.zero_grad()
 
-
+            net.eval()
+            # with torch.no_grad():
             output = net(sample)
             
-            output['pred'] = output['pred'] / 1000.0 * sample['net_mask']
-            sample['gt'] = sample['gt'] / 1000.0
+            output['pred'] = output['pred']  * sample['net_mask']
+            sample['gt'] = sample['gt'] 
 
             # loss_dep, loss_norm = loss(sample, output)
             loss_sum, loss_val = loss(sample, output)
@@ -267,9 +282,10 @@ def train(gpu, args):
                     vis = cv2.applyColorMap(vis, cv2.COLORMAP_JET)
                     return vis
 
-                out = depth_to_colormap(output["pred"][rand_idx]*1000, 1500)
-                gt = depth_to_colormap(sample["gt"][rand_idx]*1000, 1500)
-                sparse = depth_to_colormap(sample["dep"][rand_idx], 1500)
+                out = depth_to_colormap(output["pred"][rand_idx], 2.6)
+                print("--> Output max {} min {}".format(torch.max(output["pred"][rand_idx]), torch.min(output["pred"][rand_idx])))
+                gt = depth_to_colormap(sample["gt"][rand_idx], 2.6)
+                sparse = depth_to_colormap(sample["dep"][rand_idx], 2.6)
 
                 cv2.imwrite(os.path.join(folder_name, "out.png"), out)
                 cv2.imwrite(os.path.join(folder_name, "sparse.png"), sparse)
@@ -311,51 +327,37 @@ def train(gpu, args):
         writer_train.close()
         writer_val.close()
 
+def load_pretrain(args, net, ckpt):
+    assert os.path.exists(ckpt), \
+            "file not found: {}".format(ckpt)
 
-def test(args):
-    # Prepare dataset
-    # data = get_data(args)
+    checkpoint = torch.load(ckpt, map_location='cpu')
+    key_m, key_u = net.load_state_dict(checkpoint['net'], strict=False)
 
-    data_test = HammerDataset(args, "test")
+    if key_u:
+        print('Unexpected keys :')
+        print(key_u)
 
-    loader_test = DataLoader(dataset=data_test, batch_size=1,
-                             shuffle=False, num_workers=args.num_threads)
+    if key_m:
+        print('Missing keys :')
+        print(key_m)
+        raise KeyError
 
-    # Network
-    if args.model == 'CompletionFormer':
-        net = CompletionFormer(args)
-    else:
-        raise TypeError(args.model, ['CompletionFormer',])
-    net.cuda()
+    print('Checkpoint loaded from {}!'.format(ckpt))
 
-    if args.pretrain is not None:
-        assert os.path.exists(args.pretrain), \
-            "file not found: {}".format(args.pretrain)
+    return net
 
-        checkpoint = torch.load(args.pretrain)
-        key_m, key_u = net.load_state_dict(checkpoint['net'], strict=False)
-
-        if key_u:
-            print('Unexpected keys :')
-            print(key_u)
-
-        if key_m:
-            print('Missing keys :')
-            print(key_m)
-            raise KeyError
-        print('Checkpoint loaded from {}!'.format(args.pretrain))
-
+def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_writer=None):
     net = nn.DataParallel(net)
 
     metric = CompletionFormerMetric(args)
 
+    vis_dir = os.path.join(args.save_dir, 'test', 'visualization')
     try:
-        os.makedirs(args.save_dir, exist_ok=True)
-        os.makedirs(args.save_dir + '/test', exist_ok=True)
+        os.makedirs(vis_dir, exist_ok=True)
+        result_file = open(os.path.join(args.save_dir, 'test', 'results.txt'), 'w')
     except OSError:
         pass
-
-    writer_test = CompletionFormerSummary(args.save_dir, 'test', args, None, metric.metric_name)
 
     net.eval()
 
@@ -366,6 +368,7 @@ def test(args):
     t_total = 0
 
     init_seed()
+    total_metrics = None
     for batch, sample in enumerate(loader_test):
         sample = {key: val.cuda() for key, val in sample.items()
                   if val is not None}
@@ -379,11 +382,10 @@ def test(args):
 
         metric_val = metric.evaluate(sample, output, 'test')
 
-        writer_test.add(None, metric_val)
-
-        # Save data for analysis
-        if args.save_image:
-            writer_test.save(args.epochs, batch, sample, output)
+        if total_metrics is None:
+            total_metrics = metric_val[0]
+        else:
+            total_metrics += metric_val[0]
 
         current_time = time.strftime('%y%m%d@%H:%M:%S')
         error_str = '{} | Test'.format(current_time)
@@ -391,126 +393,77 @@ def test(args):
             pbar.set_description(error_str)
             pbar.update(loader_test.batch_size)
 
-    pbar.close()
+        if batch in save_samples:
+            dep = sample['dep'] # in m
+            gt = sample['gt'] # in m
+            pred = output['pred'] # in m
 
-    writer_test.update(args.epochs, sample, output)
+            def depth2vis(depth, MAX_DEPTH=2.15):
+                depth = depth.detach().cpu().numpy()[0].transpose(1,2,0)
+                vis = ((depth / MAX_DEPTH) * 255).astype(np.uint8)
+                vis = cv2.applyColorMap(vis, cv2.COLORMAP_JET)
+                return vis
+
+            gt_vis = depth2vis(gt)
+            dep_vis = depth2vis(dep)
+            pred_vis = depth2vis(pred)
+
+            os.makedirs(os.path.join(vis_dir, 'e{}'.format(epoch_idx)), exist_ok=True)
+            cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_gt.png'.format(batch)), gt_vis)
+            cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_pred.png'.format(batch)), pred_vis)
+            cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_dep.png'.format(batch)), dep_vis)
+
+    pbar.close()
 
     t_avg = t_total / num_sample
     print('Elapsed time : {} sec, '
           'Average processing time : {} sec'.format(t_total, t_avg))
 
-    # # Prepare dataset
-    # data = get_data(args)
+    metric_avg = total_metrics / num_sample
+    if summary_writer is not None:
+        for i, metric_name in enumerate(metric.metric_name):
+            summary_writer.add_scalar('test/{}'.format(metric_name), metric_avg[i], epoch_idx)
 
-    # data_test = data(args, 'test')
+    return metric_avg
 
-    # loader_test = DataLoader(dataset=data_test, batch_size=args.batch_size,
-    #                          shuffle=False, num_workers=args.num_threads)
+def test(args):
+    # -- prepare dataset --
+    data_test = HammerDataset(args, 'test')
+    loader_test = DataLoader(dataset=data_test, batch_size=1,
+                             shuffle=False, num_workers=args.num_threads)
 
-    # # Network
-    # net = PDNE(args)
+    # -- prepare network --
+    if args.model == 'VPT-V1':
+        pass
+    elif args.model == 'VPT-V2':
+        net = CompletionFormerVPTV2(args)
+    elif args.model == 'CompletionFormer':
+        pass
+    elif args.model == 'PDNE':
+        pass
+    elif args.model == 'CompletionFormerFreezed':
+        pass
+    else:
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2'])
 
-    # # device = torch.device("cuda:{}".format(device_ids[0]) if torch.cuda.is_available() else "cpu")
-    # net.cuda()
+    net.to(0)
 
-    # if args.pretrain is not None:
-    #     assert os.path.exists(args.pretrain), \
-    #         "file not found: {}".format(args.pretrain)
+    if args.pretrain is not None:
+        net = load_pretrain(args, net, args.pretrain)
+        save_samples = np.random.randint(0, len(loader_test), 10)
+        test_one_model(args, net, loader_test, save_samples)
 
-    #     checkpoint = torch.load(args.pretrain)
-    #     print('Start epoch:', checkpoint['epoch'])
-    #     net.load_state_dict(checkpoint['net'], strict=False)
-    #     print('Checkpoint loaded from {}!'.format(args.pretrain))
+    elif args.pretrain_list_file is not None:
+        summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, 'test', 'logs'))
 
-    # net = nn.DataParallel(net)
+        pretrain_list = open(args.pretrain_list_file, 'r').read().split("\n")
+        save_samples = np.random.randint(0, len(loader_test), 3)
 
-    # metric = PDNEMetric(args)
-
-    # try:
-    #     os.makedirs(args.save_dir, exist_ok=True)
-    #     os.makedirs(args.save_dir + '/test', exist_ok=True)
-    # except OSError:
-    #     pass
-
-    # total_metrics = np.zeros(np.array(metric.metric_name).shape)
-    # total_metrics_missing = np.zeros(np.array(metric.metric_name).shape)
-
-    # net.eval()
-
-    # num_sample = len(loader_test)*loader_test.batch_size
-
-    # pbar = tqdm(total=num_sample)
-
-    # t_total = 0
-
-    # init_seed()
-    # for batch, sample in enumerate(loader_test):
-    #     base_name = sample['base_name']
-    #     sample = {key: val.cuda() for key, val in sample.items()
-    #               if (val is not None) and key != 'base_name'}
-    #     sample['base_name'] = base_name
-
-    #     if args.mode == 'pd':
-    #         image_coordinate = sample['coordinate']
-    #         viewing_direction = sample['vd']
-    #         aop = sample['input'][:, 5:6, ...]
-    #         net_in = get_net_input_cuda(
-    #             sample['input'], image_coordinate, viewing_direction, args)
-    #         sample['input'] = net_in
-    #     else: aop=None
-
-    #     t0 = time.time()
-    #     with torch.no_grad():
-    #         output = net(sample)
-    #     t1 = time.time()
-
-    #     # vis the output
-
-    #     if args.mode == 'pd' or 'grayd':
-    #         sparse_type = args.sparse_dir.split('spw2_sparse_')[1]
-
-    #         if args.polar:
-    #             input_type = 'polar'
-    #         else:
-    #             input_type = 'gray'
-    #         save_dir = os.path.join(args.save_dir, args.vis_dir)
-    #         save_output(sample, output, aop, save_dir, input_type, sparse_type, args.with_norm)
-
-    #     t_total += (t1 - t0)
-
-    #     # print(output['pred'].shape)
-    #     metric_val = metric.evaluate(sample, output, 'test')
-    #     # print(metric_val[0])
-    #     metric_val_missing = metric.evaluate(sample, output, 'on_missing')
-
-    #     total_metrics = np.add(total_metrics, metric_val[0].detach().cpu())
-
-    #     total_metrics_missing = np.add(
-    #         total_metrics_missing, metric_val_missing[0].detach().cpu())
-
-    #     current_time = time.strftime('%y%m%d@%H:%M:%S')
-    #     error_str = '{} | Test'.format(current_time)
-    #     if batch % args.print_freq == 0:
-    #         pbar.set_description(error_str)
-    #         pbar.update(loader_test.batch_size)
-
-    # pbar.close()
-    # mean_metrics = np.divide(total_metrics, len(loader_test))
-    # mean_metrics_missing = np.divide(total_metrics_missing, len(loader_test))
-    # metrics_dict = {}
-    # metrics_dict_missing = {}
-
-    # for i in range(len(mean_metrics)):
-    #     name = metric.metric_name[i]
-    #     metrics_dict[name] = mean_metrics[i]
-    #     metrics_dict_missing[name] = mean_metrics_missing[i]
-
-    # # writer_test.update(args.epochs, sample, output)
-    # return metrics_dict, metrics_dict_missing
-    # # t_avg = t_total / num_sample
-    # # print('Elapsed time : {} sec, '
-    # #       'Average processing time : {} sec'.format(t_total, t_avg))
-
+        for line in pretrain_list:
+            epoch_idx = line.split(" - ")[0]
+            ckpt = line.split(" - ")[1]
+            net = load_pretrain(args, net, ckpt)
+            test_one_model(args, net, loader_test, save_samples, epoch_idx, summary_writer)
 
 def main(args):
     init_seed()
@@ -533,32 +486,7 @@ def main(args):
 
         args.pretrain = '{}/model_best.pt'.format(args.save_dir)
 
-    else:
-        # test_sparsity_list = ['spw2_sparse_ranged_tof', 'spw2_sparse_ranged_feature',
-        #                     'spw2_sparse_ranged_random', 'spw2_sparse_holes', 'spw2_sparse_ranged_fov']
-        # test_sparsity_list = ['spw2_sparse_tof']
-
-        test(args)
-
-        # test_sparsity_list = [args.sparse_dir]
-        # os.makedirs(args.save_dir, exist_ok=True)
-        # result = open(os.path.join(args.save_dir, 'test_result.txt'), 'w+')
-        # if args.mixed:
-        #     args.mixed = False
-        # for i in test_sparsity_list:
-        #     args.sparse_dir = i
-        #     args.vis_dir = 'vis_'+i.split('spw2_sparse_')[1]
-        #     metric_dict, metric_dict_missing = test(args)
-        #     if args.polar:
-        #         mode = 'polar'
-        #     else:
-        #         mode = 'gray'
-        #     result.writelines(i+' '+mode+'\n')
-
-        #     for i in metric_dict.keys():
-        #         current_str = f'{i}: {metric_dict[i]}    {i}_on_missing: {metric_dict_missing[i]}'+'\n'
-        #         result.writelines(current_str)
-        # result.close()
+    test(args)
 
 
 if __name__ == '__main__':

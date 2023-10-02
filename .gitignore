@@ -1,5 +1,4 @@
 *.pt
 *.pth
 experiments/*/
-__pycache__/
-*.pyc
+*pycache*/
