@@ -12,7 +12,10 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import cv2
 from losses.l1l2loss import L1L2Loss
+
 from datasets.hammer import HammerDataset
+from datasets.hammer_old import HammerDatasetOld
+
 from utils.mics import save_output
 from utils.metrics import PDNEMetric
 from torch.utils.tensorboard import SummaryWriter
@@ -30,9 +33,13 @@ from config import args as args_config
 import time
 import random
 import os
+
+# -- models --
 from model.completionformer_original.completionformer import CompletionFormer
 from model.completionformer_vpt_v1.completionformer_vpt_v1 import CompletionFormerVPTV1
 from model.completionformer_vpt_v2.completionformer_vpt_v2 import CompletionFormerVPTV2
+from model.completionformer_polar_cat.completionformer import CompletionFormerPolarCat
+
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
 os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
@@ -339,7 +346,7 @@ def load_pretrain(args, net, ckpt):
 
     return net
 
-def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_writer=None):
+def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_writer=None, is_old=False):
     net = nn.DataParallel(net)
 
     metric = CompletionFormerMetric(args)
@@ -365,13 +372,17 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
         sample = {key: val.cuda() for key, val in sample.items()
                   if val is not None}
 
-
         t0 = time.time()
         with torch.no_grad():
             output = net(sample)
         t1 = time.time()
 
         t_total += (t1 - t0)
+
+        if is_old:
+            sample['gt'] = sample['gt'] / 1000.0
+            sample['dep'] = sample['dep'] / 1000.0
+            output['pred'] = output['pred'] / 1000.0
 
         metric_val = metric.evaluate(sample, output, 'test')
 
@@ -397,12 +408,20 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
                 vis = cv2.applyColorMap(vis, cv2.COLORMAP_JET)
                 return vis
 
-            gt_vis = depth2vis(gt)
-            dep_vis = depth2vis(dep)
-            pred_vis = depth2vis(pred)
+            gt_vis = depth2vis(gt, 2.15)
+            dep_vis = depth2vis(dep, 2.15)
+            pred_vis = depth2vis(pred, 2.15)
+            # -- error map --
+            gt_mask = gt.detach().cpu().numpy()[0].transpose(1,2,0)
+            gt_mask[gt_mask <= 0.001] = 0
+            err = torch.abs(pred-gt)
+            print("--> Min err {} max err {}".format(torch.min(err), torch.max(err)))
+            error_map_vis = depth2vis(err, 0.55)
+            error_map_vis[np.tile(gt_mask, (1,1,3))==0] = 0
 
             os.makedirs(os.path.join(vis_dir, 'e{}'.format(epoch_idx)), exist_ok=True)
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_gt.png'.format(batch)), gt_vis)
+            cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_err.png'.format(batch)), error_map_vis)
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_pred.png'.format(batch)), pred_vis)
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_dep.png'.format(batch)), dep_vis)
 
@@ -420,12 +439,9 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
     return metric_avg
 
 def test(args):
-    # -- prepare dataset --
-    data_test = HammerDataset(args, 'test')
-    loader_test = DataLoader(dataset=data_test, batch_size=1,
-                             shuffle=False, num_workers=args.num_threads)
 
     # -- prepare network --
+    is_old = False
     if args.model == 'VPT-V1':
         pass
     elif args.model == 'VPT-V2':
@@ -436,27 +452,38 @@ def test(args):
         pass
     elif args.model == 'CompletionFormerFreezed':
         pass
+    elif args.model == 'POLAR-CAT':
+        is_old = True
+        net = CompletionFormerPolarCat(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2'])
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'POLAR-CAT'])
+
+    # -- prepare dataset --
+    data_test = HammerDataset(args, 'test') if not is_old else HammerDatasetOld(args, 'test')
+    loader_test = DataLoader(dataset=data_test, batch_size=1,
+                             shuffle=False, num_workers=args.num_threads)
 
     net.to(0)
 
     if args.pretrain is not None:
         net = load_pretrain(args, net, args.pretrain)
         save_samples = np.random.randint(0, len(loader_test), 10)
-        test_one_model(args, net, loader_test, save_samples)
+        test_one_model(args, net, loader_test, save_samples, is_old=is_old)
 
     elif args.pretrain_list_file is not None:
         summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, 'test', 'logs'))
 
         pretrain_list = open(args.pretrain_list_file, 'r').read().split("\n")
-        save_samples = np.random.randint(0, len(loader_test), 3)
+        num_samples_to_save = 3 if len(pretrain_list) >= 5 else 50
+        if len(pretrain_list) == 1:
+            num_samples_to_save = int(len(loader_test) / 6.0)
+        save_samples = np.random.randint(0, len(loader_test), num_samples_to_save)
 
         for line in pretrain_list:
             epoch_idx = line.split(" - ")[0]
             ckpt = line.split(" - ")[1]
             net = load_pretrain(args, net, ckpt)
-            test_one_model(args, net, loader_test, save_samples, epoch_idx, summary_writer)
+            test_one_model(args, net, loader_test, save_samples, epoch_idx, summary_writer, is_old=is_old)
 
 def main(args):
     init_seed()
