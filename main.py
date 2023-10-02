@@ -100,7 +100,7 @@ def train(gpu, args):
 
 
     # Prepare dataset
-    dataset = HammerDataset(args, "train")
+    dataset = HammerDataset(args, "train") if args.model != 'POLAR-CAT' else HammerDatasetOld(args, "train")
 
     sampler_train = DistributedSampler(
         dataset, num_replicas=args.num_gpus, rank=gpu)
