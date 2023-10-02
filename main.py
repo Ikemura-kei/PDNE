@@ -34,6 +34,7 @@ import random
 import os
 from model.completionformer_original.completionformer import CompletionFormer
 from model.completionformer_vpt_v1.completionformer_vpt_v1 import CompletionFormerVPTV1
+from model.completionformer_polar_cat.completionformer import CompletionFormerPolarCat
 os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
 os.environ["MASTER_ADDR"] = args_config.address
 os.environ["MASTER_PORT"] = args_config.port
@@ -84,7 +85,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10005',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10002',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -109,8 +110,12 @@ def train(gpu, args):
         net = PDNE(args)
     elif args.model == 'VPT-V1':
         net = CompletionFormerVPTV1(args)
+    elif args.model == 'POLAR-CAT':
+        net = CompletionFormerPolarCat(args)
+    elif args.model == 'FFT':
+        pass
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1'])
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'FFT', 'POLAR-CAT'])
 
     net.cuda(gpu)
 
@@ -156,7 +161,7 @@ def train(gpu, args):
     net = DDP(net)
 
     metric = PDNEMetric(args)
-
+    args.save_freq = 3
     if gpu == 0:
         os.makedirs(args.save_dir, exist_ok=True)
         os.makedirs(args.save_dir + '/train', exist_ok=True)
