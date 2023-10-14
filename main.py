@@ -35,6 +35,7 @@ from model.completionformer_vpt_v1.completionformer_vpt_v1 import CompletionForm
 from model.completionformer_vpt_v2.completionformer_vpt_v2 import CompletionFormerVPTV2
 from model.completionformer_vpt_v2.completionformer_vpt_v2_1 import CompletionFormerVPTV2_1
 from model.completionformer_prompt_finetune.completionformer_prompt_finetune import CompletionFormerPromptFinetune
+from model.completionformer_rgb_finetune.completionformer_rgb_finetune import CompletionFormerRgbFinetune
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
 os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
@@ -69,7 +70,7 @@ def check_args(args):
             "file not found: {}".format(args.pretrain)
 
         if args.resume:
-            checkpoint = torch.load(args.pretrain, map_location={'cuda:0':'cuda:1'})
+            checkpoint = torch.load(args.pretrain, map_location='cpu')
 
             new_args = checkpoint['args']
             new_args.test_only = args.test_only
@@ -123,8 +124,10 @@ def train(gpu, args):
         net = CompletionFormerVPTV2_1(args)
     elif args.model == 'PromptFinetune':
         net = CompletionFormerPromptFinetune(args)
+    elif args.model == 'RgbFinetune':
+        net = CompletionFormerRgbFinetune(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2'])
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RgbFinetune'])
 
     net.cuda(gpu)
 

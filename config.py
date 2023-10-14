@@ -94,7 +94,7 @@ parser.add_argument('--pretrain_list_file', type=str, default=None, help="the te
 parser.add_argument('--model',
                     type=str,
                     default='CompletionFormer',
-                    choices=('CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'PromptFinetune', 'VPT-V2'),
+                    choices=('CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'PromptFinetune', 'VPT-V2', 'RgbFinetune'),
                     help='main model name')
 parser.add_argument('--from_scratch',
                     action='store_true',
