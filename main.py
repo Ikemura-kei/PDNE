@@ -455,6 +455,8 @@ def test(args):
     elif args.model == 'POLAR-CAT':
         is_old = True
         net = CompletionFormerPolarCat(args)
+    elif args.model == 'RgbFinetune':
+        net = CompletionFormerPolarCat(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'POLAR-CAT', 'PromptFinetune'])
 
