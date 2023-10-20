@@ -15,6 +15,9 @@ from losses.l1l2loss import L1L2Loss
 
 from datasets.hammer import HammerDataset
 from datasets.hammer_old import HammerDatasetOld
+from datasets.hammer_single_old import HammerSingleDepthDatasetOld
+
+from datasets.hammer_single_depth import HammerSingleDepthDataset
 
 from utils.mics import save_output
 from utils.metrics import PDNEMetric
@@ -120,7 +123,7 @@ def train(gpu, args):
     elif args.model == 'CompletionFormerFreezed':
         net = CompletionFormer(args)
         if args.pretrained_completionformer is not None:
-            net.load_state_dict(torch.load(args.pretrained_completionformer)['net'])
+            net.load_state_dict(torch.load(args.pretrained_completionformer, map_location='cpu')['net'])
             for p in net.parameters():
                 p.requires_grad = False
     elif args.model == 'PDNE':
@@ -344,7 +347,7 @@ def load_pretrain(args, net, ckpt):
 
     return net
 
-def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_writer=None, is_old=False):
+def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_writer=None, is_old=False, result_dict=None, idx=0):
     net = nn.DataParallel(net)
 
     metric = CompletionFormerMetric(args)
@@ -366,9 +369,10 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
 
     init_seed()
     total_metrics = None
+
     for batch, sample in enumerate(loader_test):
         sample = {key: val.cuda() for key, val in sample.items()
-                  if val is not None}
+                  if (val is not None) and key != 'basename'}
 
         t0 = time.time()
         with torch.no_grad():
@@ -394,6 +398,17 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
         if batch % args.print_freq == 0:
             pbar.set_description(error_str)
             pbar.update(loader_test.batch_size)
+        
+        metric_dict = {}
+        count = 0
+        for m in metric.metric_name:
+            # print(metric_val[0])
+            metric_dict[m] = metric_val[0][count].detach().cpu().numpy().astype(float).tolist()
+            # print(m, metric_dict[m])
+            count += 1
+        if result_dict is not None:
+            # print(f's{idx+batch}.png')
+            result_dict[f's{idx+batch}.png'] = metric_dict
 
         if batch in save_samples:
             dep = sample['dep'] # in m
@@ -413,7 +428,7 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
             gt_mask = gt.detach().cpu().numpy()[0].transpose(1,2,0)
             gt_mask[gt_mask <= 0.001] = 0
             err = torch.abs(pred-gt)
-            print("--> Min err {} max err {}".format(torch.min(err), torch.max(err)))
+
             error_map_vis = depth2vis(err, 0.55)
             error_map_vis[np.tile(gt_mask, (1,1,3))==0] = 0
 
@@ -422,7 +437,7 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_err.png'.format(batch)), error_map_vis)
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_pred.png'.format(batch)), pred_vis)
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_dep.png'.format(batch)), dep_vis)
-
+    
     pbar.close()
 
     t_avg = t_total / num_sample
@@ -449,28 +464,39 @@ def test(args):
     elif args.model == 'PDNE':
         pass
     elif args.model == 'CompletionFormerFreezed':
-        pass
+        net = CompletionFormer(args)
     elif args.model == 'PromptFinetune':
         net = CompletionFormerPromptFinetune(args)
     elif args.model == 'POLAR-CAT':
         is_old = True
         net = CompletionFormerPolarCat(args)
     elif args.model == 'RgbFinetune':
-        net = CompletionFormerPolarCat(args)
+        net = CompletionFormerRgbFinetune(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'POLAR-CAT', 'PromptFinetune'])
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'POLAR-CAT', 'PromptFinetune', 'RgbFinetune'])
 
     # -- prepare dataset --
-    data_test = HammerDataset(args, 'test') if not is_old else HammerDatasetOld(args, 'test')
+    if args.use_single:
+        data_test = HammerSingleDepthDataset(args, 'test')if not is_old else HammerSingleDepthDatasetOld(args, 'test')
+    else:
+        data_test = HammerDataset(args, 'test') if not is_old else HammerDatasetOld(args, 'test')
+
+    result_dict = {}
+
     loader_test = DataLoader(dataset=data_test, batch_size=1,
                              shuffle=False, num_workers=args.num_threads)
 
     net.to(0)
 
     if args.pretrain is not None:
+        summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, 'test', 'logs'))
+
         net = load_pretrain(args, net, args.pretrain)
-        save_samples = np.random.randint(0, len(loader_test), 10)
-        test_one_model(args, net, loader_test, save_samples, is_old=is_old)
+        # save_samples = np.random.randint(0, len(loader_test), 10)
+        save_samples = np.arange(len(loader_test))
+
+        test_one_model(args, net, loader_test, save_samples, is_old=is_old, result_dict=result_dict, summary_writer=summary_writer)
+        summary_writer.close()
 
     elif args.pretrain_list_file is not None:
         summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, 'test', 'logs'))
@@ -479,13 +505,20 @@ def test(args):
         num_samples_to_save = 3 if len(pretrain_list) >= 5 else 50
         if len(pretrain_list) == 1:
             num_samples_to_save = int(len(loader_test) / 6.0)
-        save_samples = np.random.randint(0, len(loader_test), num_samples_to_save)
-
+        # save_samples = np.random.randint(0, len(loader_test), num_samples_to_save)
+        save_samples = np.arange(len(loader_test))
+        line_idx = 0
         for line in pretrain_list:
             epoch_idx = line.split(" - ")[0]
             ckpt = line.split(" - ")[1]
             net = load_pretrain(args, net, ckpt)
-            test_one_model(args, net, loader_test, save_samples, epoch_idx, summary_writer, is_old=is_old)
+            test_one_model(args, net, loader_test, save_samples, epoch_idx, summary_writer, is_old=is_old, result_dict=result_dict, idx=line_idx)
+            line_idx += 1
+        summary_writer.close()
+
+        
+    with open(args.save_dir + '/result.json', 'w') as args_json:
+        json.dump(result_dict, args_json, indent=4)
 
 def main(args):
     init_seed()

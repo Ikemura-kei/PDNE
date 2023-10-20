@@ -1,0 +1,1 @@
+0 - /root/autodl-tmp/yiming/PDNE/pretrained/comp/NYUv2.pt

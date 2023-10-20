@@ -356,6 +356,13 @@ parser.add_argument('--pretrain_path_comp',
                     type=str,
                     default='bn')
 
+parser.add_argument('--use_single',
+                    action='store_true')
+
+parser.add_argument('--depth_type',
+                    type=int,
+                    default=0)
+
 
 args = parser.parse_args()
 args.num_gpus = len(args.gpus.split(','))
