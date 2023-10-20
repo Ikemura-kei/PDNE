@@ -35,13 +35,14 @@ from model.completionformer_vpt_v1.completionformer_vpt_v1 import CompletionForm
 from model.completionformer_vpt_v2.completionformer_vpt_v2 import CompletionFormerVPTV2
 from model.completionformer_vpt_v2.completionformer_vpt_v2_1 import CompletionFormerVPTV2_1
 from model.completionformer_prompt_finetune.completionformer_prompt_finetune import CompletionFormerPromptFinetune
+from model.completionformer_rgb_prompt_finetune.completionformer_rgb_prompt_finetune import CompletionFormerRGBPromptFinetune
+
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
 os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
 os.environ["MASTER_ADDR"] = args_config.address
 os.environ["MASTER_PORT"] = args_config.port
 
-torch.autograd.set_detect_anomaly(True)
 
 # Multi-GPU and Mixed precision supports
 # NOTE : Only 1 process per GPU is supported now
@@ -123,8 +124,10 @@ def train(gpu, args):
         net = CompletionFormerVPTV2_1(args)
     elif args.model == 'PromptFinetune':
         net = CompletionFormerPromptFinetune(args)
+    elif args.model == 'RGBPromptFinetune':
+        net = CompletionFormerRGBPromptFinetune(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2'])
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune'])
 
     net.cuda(gpu)
 
@@ -240,7 +243,8 @@ def train(gpu, args):
 
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
-
+                
+            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=20, norm_type=2)
             optimizer.step()
 
             if gpu == 0:
@@ -433,12 +437,15 @@ def test(args):
         pass
     elif args.model == 'PromptFinetune':
         net = CompletionFormerPromptFinetune(args)
+    elif args.model == 'RGBPromptFinetune':
+        net = CompletionFormerRGBPromptFinetune(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'PromptFinetune'])
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'PromptFinetune', 'RGBPromptFinetune'])
 
     net.to(0)
 
     if args.pretrain is not None:
+        
         net = load_pretrain(args, net, args.pretrain)
         save_samples = np.random.randint(0, len(loader_test), 10)
         test_one_model(args, net, loader_test, save_samples)
