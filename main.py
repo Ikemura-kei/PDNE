@@ -89,7 +89,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10001',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10009',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -254,7 +254,7 @@ def train(gpu, args):
                 log_cnt += 1
                 log_loss += loss_sum.item()
 
-                e_string = f"{(log_loss/log_cnt):.2f}"
+                e_string = f"{(log_loss/log_cnt):.6f}"
                 if batch % args.print_freq == 0:
                     pbar.set_description(e_string)
                     pbar.update(loader_train.batch_size * args.num_gpus)
