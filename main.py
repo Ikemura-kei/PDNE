@@ -41,7 +41,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
 os.environ["MASTER_ADDR"] = args_config.address
 os.environ["MASTER_PORT"] = args_config.port
 
-torch.autograd.set_detect_anomaly(True)
 
 # Multi-GPU and Mixed precision supports
 # NOTE : Only 1 process per GPU is supported now
@@ -232,7 +231,6 @@ def train(gpu, args):
 
             loss_sum, loss_val = loss(sample, output)
                 
-            loss_sum_norm=0
 
             # Divide by batch size
             loss_sum = loss_sum / loader_train.batch_size
@@ -240,6 +238,7 @@ def train(gpu, args):
 
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
+            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=9, norm_type=2)
 
             optimizer.step()
 
