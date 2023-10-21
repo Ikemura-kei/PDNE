@@ -36,13 +36,14 @@ from model.completionformer_vpt_v2.completionformer_vpt_v2 import CompletionForm
 from model.completionformer_vpt_v2.completionformer_vpt_v2_1 import CompletionFormerVPTV2_1
 from model.completionformer_prompt_finetune.completionformer_prompt_finetune import CompletionFormerPromptFinetune
 from model.completionformer_rgb_finetune.completionformer_rgb_finetune import CompletionFormerRgbFinetune
+from model.completionformer_rgb_scratch.completionformer_rgb_scratch import CompletionFormerRgbScratch
+
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
 os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
 os.environ["MASTER_ADDR"] = args_config.address
 os.environ["MASTER_PORT"] = args_config.port
 
-torch.autograd.set_detect_anomaly(True)
 
 # Multi-GPU and Mixed precision supports
 # NOTE : Only 1 process per GPU is supported now
@@ -89,7 +90,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10001',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10002',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -126,8 +127,10 @@ def train(gpu, args):
         net = CompletionFormerPromptFinetune(args)
     elif args.model == 'RgbFinetune':
         net = CompletionFormerRgbFinetune(args)
+    elif args.model == 'RgbScratch':
+        net = CompletionFormerRgbScratch(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RgbFinetune'])
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RgbFinetune', 'RgbScratch'])
 
     net.cuda(gpu)
 
@@ -235,8 +238,6 @@ def train(gpu, args):
 
             loss_sum, loss_val = loss(sample, output)
                 
-            loss_sum_norm=0
-
             # Divide by batch size
             loss_sum = loss_sum / loader_train.batch_size
             loss_val = loss_val / loader_train.batch_size
@@ -244,6 +245,7 @@ def train(gpu, args):
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
 
+            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=10, norm_type=2)
             optimizer.step()
 
             if gpu == 0:
