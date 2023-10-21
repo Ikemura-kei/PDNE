@@ -45,6 +45,9 @@ from model.completionformer_vpt_v2.completionformer_vpt_v2_1 import CompletionFo
 from model.completionformer_prompt_finetune.completionformer_prompt_finetune import CompletionFormerPromptFinetune
 from model.completionformer_rgb_finetune.completionformer_rgb_finetune import CompletionFormerRgbFinetune
 from model.completionformer_polar_cat.completionformer import CompletionFormerPolarCat
+from model.completionformer_rgb_prompt_finetune.completionformer_rgb_prompt_finetune import CompletionFormerRGBPromptFinetune
+from model.completionformer_rgb_scratch.completionformer_rgb_scratch import CompletionFormerRgbScratch
+from model.completionformer_early_fusion.completionformer_early_fusion import CompletionFormerEarlyFusion
 
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
@@ -52,7 +55,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
 os.environ["MASTER_ADDR"] = args_config.address
 os.environ["MASTER_PORT"] = args_config.port
 
-torch.autograd.set_detect_anomaly(True)
 
 # Multi-GPU and Mixed precision supports
 # NOTE : Only 1 process per GPU is supported now
@@ -136,8 +138,14 @@ def train(gpu, args):
         net = CompletionFormerPromptFinetune(args)
     elif args.model == 'RgbFinetune':
         net = CompletionFormerRgbFinetune(args)
+    elif args.model == 'RGBPromptFinetune':
+        net = CompletionFormerRGBPromptFinetune(args)
+    elif args.model == 'RgbScratch':
+        net = CompletionFormerRgbScratch(args)
+    elif args.model == 'EarlyFusion':
+        net = CompletionFormerEarlyFusion(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RgbFinetune'])
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'RgbFinetune'])
 
     net.cuda(gpu)
 
@@ -253,7 +261,8 @@ def train(gpu, args):
 
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
-
+                
+            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=20, norm_type=2)
             optimizer.step()
 
             if gpu == 0:
@@ -445,9 +454,15 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
           'Average processing time : {} sec'.format(t_total, t_avg))
 
     metric_avg = total_metrics / num_sample
+    current_result = {}
+
     if summary_writer is not None:
         for i, metric_name in enumerate(metric.metric_name):
             summary_writer.add_scalar('test/{}'.format(metric_name), metric_avg[i], epoch_idx)
+            current_result[metric_name] = metric_avg[i]
+        
+    with open(args.save_dir + f'/result_{idx}.json', 'w') as current_json:
+        json.dump(result_dict, current_json, indent=4)
 
     return metric_avg
 
@@ -472,8 +487,14 @@ def test(args):
         net = CompletionFormerPolarCat(args)
     elif args.model == 'RgbFinetune':
         net = CompletionFormerRgbFinetune(args)
+    elif args.model == 'RGBPromptFinetune':
+        net = CompletionFormerRGBPromptFinetune(args)
+    elif args.model == 'RgbScratch':
+        net = CompletionFormerRgbScratch(args)
+    elif args.model == 'EarlyFusion':
+        net = CompletionFormerEarlyFusion(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'POLAR-CAT', 'PromptFinetune', 'RgbFinetune'])
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'PromptFinetune', 'RgbFinetune', 'RGBPromptFinetune'])
 
     # -- prepare dataset --
     if args.use_single:
@@ -491,6 +512,7 @@ def test(args):
     if args.pretrain is not None:
         summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, 'test', 'logs'))
 
+        
         net = load_pretrain(args, net, args.pretrain)
         # save_samples = np.random.randint(0, len(loader_test), 10)
         save_samples = np.arange(len(loader_test))
@@ -504,9 +526,11 @@ def test(args):
         pretrain_list = open(args.pretrain_list_file, 'r').read().split("\n")
         num_samples_to_save = 3 if len(pretrain_list) >= 5 else 50
         if len(pretrain_list) == 1:
-            num_samples_to_save = int(len(loader_test) / 6.0)
-        # save_samples = np.random.randint(0, len(loader_test), num_samples_to_save)
-        save_samples = np.arange(len(loader_test))
+            save_samples = np.arange(len(loader_test))
+        else:
+            num_samples_to_save = int(len(loader_test) / 40.0)
+            save_samples = np.random.randint(0, len(loader_test), num_samples_to_save)
+        
         line_idx = 0
         for line in pretrain_list:
             epoch_idx = line.split(" - ")[0]
