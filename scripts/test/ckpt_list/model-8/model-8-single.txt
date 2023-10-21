@@ -1,0 +1,1 @@
+96 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_SCRATCH/PDNE/experiments/231018_021259_model-8/model_00096.pt

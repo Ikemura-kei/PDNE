@@ -1,4 +1,3 @@
-58 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_FINETUNE/PDNE/experiments/231014_184054_model-6/model_00058.pt
 10 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_FINETUNE/PDNE/experiments/231014_184054_model-6/model_00010.pt
 16 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_FINETUNE/PDNE/experiments/231014_184054_model-6/model_00016.pt
 22 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_FINETUNE/PDNE/experiments/231014_184054_model-6/model_00022.pt
@@ -7,6 +6,7 @@
 40 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_FINETUNE/PDNE/experiments/231014_184054_model-6/model_00040.pt
 46 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_FINETUNE/PDNE/experiments/231014_184054_model-6/model_00046.pt
 52 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_FINETUNE/PDNE/experiments/231014_184054_model-6/model_00052.pt
+58 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_FINETUNE/PDNE/experiments/231014_184054_model-6/model_00058.pt
 64 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_FINETUNE/PDNE/experiments/231014_184054_model-6/model_00064.pt
 70 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_FINETUNE/PDNE/experiments/231014_184054_model-6/model_00070.pt
 76 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_FINETUNE/PDNE/experiments/231014_184054_model-6/model_00076.pt

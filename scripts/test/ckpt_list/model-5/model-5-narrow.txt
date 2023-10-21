@@ -1,4 +1,3 @@
 55 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_PROMT_FINETUNE/PDNE/experiments/231009_071954_model-5/model_00055.pt
 72 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_PROMT_FINETUNE/PDNE/experiments/231009_071954_model-5/model_00072.pt
-92 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_PROMT_FINETUNE/PDNE/experiments/231009_071954_model-5/model_00092.pt
-78 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_PROMT_FINETUNE/PDNE/experiments/231009_071954_model-5/model_00078.pt
+98 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_PROMT_FINETUNE/PDNE/experiments/231009_071954_model-5/model_00098.pt

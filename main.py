@@ -44,14 +44,11 @@ from model.completionformer_vpt_v2.completionformer_vpt_v2 import CompletionForm
 from model.completionformer_vpt_v2.completionformer_vpt_v2_1 import CompletionFormerVPTV2_1
 from model.completionformer_prompt_finetune.completionformer_prompt_finetune import CompletionFormerPromptFinetune
 from model.completionformer_rgb_finetune.completionformer_rgb_finetune import CompletionFormerRgbFinetune
-<<<<<<< HEAD
 from model.completionformer_polar_cat.completionformer import CompletionFormerPolarCat
 from model.completionformer_rgb_prompt_finetune.completionformer_rgb_prompt_finetune import CompletionFormerRGBPromptFinetune
 from model.completionformer_rgb_scratch.completionformer_rgb_scratch import CompletionFormerRgbScratch
 from model.completionformer_early_fusion.completionformer_early_fusion import CompletionFormerEarlyFusion
-=======
 from model.completionformer_rgb_scratch.completionformer_rgb_scratch import CompletionFormerRgbScratch
->>>>>>> 9f3b9642093f2670afbc022d2d505046c61904a7
 
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
@@ -142,7 +139,6 @@ def train(gpu, args):
         net = CompletionFormerPromptFinetune(args)
     elif args.model == 'RgbFinetune':
         net = CompletionFormerRgbFinetune(args)
-<<<<<<< HEAD
     elif args.model == 'RGBPromptFinetune':
         net = CompletionFormerRGBPromptFinetune(args)
     elif args.model == 'RgbScratch':
@@ -150,13 +146,7 @@ def train(gpu, args):
     elif args.model == 'EarlyFusion':
         net = CompletionFormerEarlyFusion(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'RgbFinetune'])
-=======
-    elif args.model == 'RgbScratch':
-        net = CompletionFormerRgbScratch(args)
-    else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RgbFinetune', 'RgbScratch'])
->>>>>>> 9f3b9642093f2670afbc022d2d505046c61904a7
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'RgbFinetune', 'RgbScratch'])
 
     net.cuda(gpu)
 
@@ -270,13 +260,8 @@ def train(gpu, args):
 
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
-<<<<<<< HEAD
                 
             torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=20, norm_type=2)
-=======
-
-            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=10, norm_type=2)
->>>>>>> 9f3b9642093f2670afbc022d2d505046c61904a7
             optimizer.step()
 
             if gpu == 0:
@@ -508,7 +493,7 @@ def test(args):
     elif args.model == 'EarlyFusion':
         net = CompletionFormerEarlyFusion(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'PromptFinetune', 'RgbFinetune', 'RGBPromptFinetune'])
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'PromptFinetune', 'RgbFinetune', 'RGBPromptFinetune', 'RgbScratch'])
 
     # -- prepare dataset --
     if args.use_single:

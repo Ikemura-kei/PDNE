@@ -1,0 +1,6 @@
+34 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_SCRATCH/PDNE/experiments/231018_021259_model-8/model_00034.pt
+40 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_SCRATCH/PDNE/experiments/231018_021259_model-8/model_00040.pt
+54 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_SCRATCH/PDNE/experiments/231018_021259_model-8/model_00054.pt
+90 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_SCRATCH/PDNE/experiments/231018_021259_model-8/model_00090.pt
+96 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_SCRATCH/PDNE/experiments/231018_021259_model-8/model_00096.pt
+122 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_SCRATCH/PDNE/experiments/231018_021259_model-8/model_00122.pt
