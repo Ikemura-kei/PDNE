@@ -44,10 +44,14 @@ from model.completionformer_vpt_v2.completionformer_vpt_v2 import CompletionForm
 from model.completionformer_vpt_v2.completionformer_vpt_v2_1 import CompletionFormerVPTV2_1
 from model.completionformer_prompt_finetune.completionformer_prompt_finetune import CompletionFormerPromptFinetune
 from model.completionformer_rgb_finetune.completionformer_rgb_finetune import CompletionFormerRgbFinetune
+<<<<<<< HEAD
 from model.completionformer_polar_cat.completionformer import CompletionFormerPolarCat
 from model.completionformer_rgb_prompt_finetune.completionformer_rgb_prompt_finetune import CompletionFormerRGBPromptFinetune
 from model.completionformer_rgb_scratch.completionformer_rgb_scratch import CompletionFormerRgbScratch
 from model.completionformer_early_fusion.completionformer_early_fusion import CompletionFormerEarlyFusion
+=======
+from model.completionformer_rgb_scratch.completionformer_rgb_scratch import CompletionFormerRgbScratch
+>>>>>>> 9f3b9642093f2670afbc022d2d505046c61904a7
 
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
@@ -101,7 +105,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10001',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10002',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -138,6 +142,7 @@ def train(gpu, args):
         net = CompletionFormerPromptFinetune(args)
     elif args.model == 'RgbFinetune':
         net = CompletionFormerRgbFinetune(args)
+<<<<<<< HEAD
     elif args.model == 'RGBPromptFinetune':
         net = CompletionFormerRGBPromptFinetune(args)
     elif args.model == 'RgbScratch':
@@ -146,6 +151,12 @@ def train(gpu, args):
         net = CompletionFormerEarlyFusion(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'RgbFinetune'])
+=======
+    elif args.model == 'RgbScratch':
+        net = CompletionFormerRgbScratch(args)
+    else:
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RgbFinetune', 'RgbScratch'])
+>>>>>>> 9f3b9642093f2670afbc022d2d505046c61904a7
 
     net.cuda(gpu)
 
@@ -253,16 +264,19 @@ def train(gpu, args):
 
             loss_sum, loss_val = loss(sample, output)
                 
-            loss_sum_norm=0
-
             # Divide by batch size
             loss_sum = loss_sum / loader_train.batch_size
             loss_val = loss_val / loader_train.batch_size
 
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
+<<<<<<< HEAD
                 
             torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=20, norm_type=2)
+=======
+
+            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=10, norm_type=2)
+>>>>>>> 9f3b9642093f2670afbc022d2d505046c61904a7
             optimizer.step()
 
             if gpu == 0:
