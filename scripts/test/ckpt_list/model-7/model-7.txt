@@ -1,0 +1,16 @@
+42 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00042.pt
+48 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00048.pt
+54 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00054.pt
+60 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00060.pt
+66 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00066.pt
+72 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00072.pt
+78 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00078.pt
+82 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00082.pt
+88 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00088.pt
+94 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00094.pt
+100 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00100.pt
+106 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00106.pt
+112 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00112.pt
+118 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00118.pt
+120 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00120.pt
+126 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00126.pt

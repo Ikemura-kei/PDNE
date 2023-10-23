@@ -1,0 +1,5 @@
+42 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00042.pt
+72 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00072.pt
+82 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00082.pt
+88 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00088.pt
+112 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_PROMPT_FINETUNE/PDNE/experiments/231018_021051_model-7/model_00112.pt

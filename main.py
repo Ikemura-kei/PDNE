@@ -95,14 +95,13 @@ def check_args(args):
 
     return new_args
 
-
 def train(gpu, args):
     global best_rmse
     global best_mae
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10002',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10009',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -271,7 +270,7 @@ def train(gpu, args):
                 log_cnt += 1
                 log_loss += loss_sum.item()
 
-                e_string = f"{(log_loss/log_cnt):.2f}"
+                e_string = f"{(log_loss/log_cnt):.6f}"
                 if batch % args.print_freq == 0:
                     pbar.set_description(e_string)
                     pbar.update(loader_train.batch_size * args.num_gpus)
@@ -458,15 +457,14 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
     if summary_writer is not None:
         for i, metric_name in enumerate(metric.metric_name):
             summary_writer.add_scalar('test/{}'.format(metric_name), metric_avg[i], epoch_idx)
-            current_result[metric_name] = metric_avg[i]
+            current_result[metric_name] = (metric_avg[i].item()).to_list()
         
     with open(args.save_dir + f'/result_{idx}.json', 'w') as current_json:
-        json.dump(result_dict, current_json, indent=4)
+        json.dump(current_result, current_json, indent=4)
 
     return metric_avg
 
 def test(args):
-
     # -- prepare network --
     is_old = False
     if args.model == 'VPT-V1':
