@@ -41,7 +41,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
 os.environ["MASTER_ADDR"] = args_config.address
 os.environ["MASTER_PORT"] = args_config.port
 
-
+torch.autograd.set_detect_anomaly(True)
 # Multi-GPU and Mixed precision supports
 # NOTE : Only 1 process per GPU is supported now
 torch.backends.cudnn.deterministic = True
@@ -87,7 +87,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10001',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10009',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -238,7 +238,10 @@ def train(gpu, args):
 
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
-            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=9, norm_type=2)
+
+            # for param in net.parameters():
+            #     print("param=%s, grad=%s" % (param.data.item(), param.grad.item()))
+            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=4, norm_type=2)
 
             optimizer.step()
 
