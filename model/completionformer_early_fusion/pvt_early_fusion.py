@@ -178,6 +178,7 @@ class PyramidVisionTransformer(nn.Module):
         self.depths = depths
         self.num_stages = num_stages
         self.use_prompt = use_prompt
+        print("Use prompt:", self.use_prompt)
 
         setattr(self, "embed_layer1", foundation.embed_layer1)
         setattr(self, "embed_layer2", foundation.embed_layer2)
@@ -311,11 +312,11 @@ def _conv_filter(state_dict, patch_size=16):
     return out_dict
 
 
-class PVTPromptFinetune(PyramidVisionTransformer):
+class PVTEarlyFusion(PyramidVisionTransformer):
     def __init__(self, in_chans, patch_size=4, foundation=None, **kwargs):
-        super(PVTPromptFinetune, self).__init__(
+        super(PVTEarlyFusion, self).__init__(
             patch_size=patch_size, in_chans=in_chans, embed_dims=[64, 128, 320, 512], num_heads=[1, 2, 5, 8], mlp_ratios=[8, 8, 4, 4],
             qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), depths=[3, 4, 6, 3],
-            sr_ratios=[8, 4, 2, 1], drop_rate=0.0, drop_path_rate=0.1, pretrained=kwargs['pretrained'], use_prompt=True, foundation=foundation)
+            sr_ratios=[8, 4, 2, 1], drop_rate=0.0, drop_path_rate=0.1, pretrained=kwargs['pretrained'], use_prompt=False, foundation=foundation)
 
 

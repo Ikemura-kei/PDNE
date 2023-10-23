@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .resnet_cbam import BasicBlock
-from .pvt_prompt_finetune import PVTPromptFinetune
+from .pvt_early_fusion import PVTEarlyFusion
 from .backbone import Backbone
 
 
@@ -41,9 +41,9 @@ def convt_bn_relu(ch_in, ch_out, kernel, stride=1, padding=0, output_padding=0,
 
     return layers
 
-class BackbonePromptFinetune(nn.Module):
+class BackboneEarlyFusion(nn.Module):
     def __init__(self, args, foundation, mode='rgbd'):
-        super(BackbonePromptFinetune, self).__init__()
+        super(BackboneEarlyFusion, self).__init__()
         self.args = args
         self.mode = mode
         self.num_neighbors = self.args.prop_kernel*self.args.prop_kernel - 1
@@ -58,11 +58,11 @@ class BackbonePromptFinetune(nn.Module):
             self.conv1_dep = foundation.conv1_dep
             self.conv1 = foundation.conv1
             # -- the following two are the only updating layers --
-            self.prompt = nn.Parameter(torch.zeros([1, 48, 208, 272])) # TODO: make the dimensions flexible
-            nn.init.uniform_(self.prompt)
+            # self.prompt = nn.Parameter(torch.zeros([1, 48, 208, 272])) # TODO: make the dimensions flexible
+            # nn.init.uniform_(self.prompt)
 
-            self.dep_prompt = nn.Parameter(torch.zeros([1, 16, 208, 272])) # TODO: make the dimensions flexible
-            nn.init.uniform_(self.dep_prompt)
+            # self.dep_prompt = nn.Parameter(torch.zeros([1, 16, 208, 272])) # TODO: make the dimensions flexible
+            # nn.init.uniform_(self.dep_prompt)
 
             if self.args.pol_rep == 'grayscale-4':
                 self.conv1_pol_for_rgb = conv_bn_relu(4, 16, kernel=3, stride=1, padding=1,
@@ -95,7 +95,7 @@ class BackbonePromptFinetune(nn.Module):
             raise TypeError(mode)
         
         # self.former = foundation.former
-        self.former = PVTPromptFinetune(in_chans=64, patch_size=2, pretrained='./model/completionformer_original/pretrained/pvt.pth', foundation=foundation.former)
+        self.former = PVTEarlyFusion(in_chans=64, patch_size=2, pretrained='./model/completionformer_original/pretrained/pvt.pth', foundation=foundation.former)
 
         # Shared Decoder
         # 1/16
@@ -147,12 +147,12 @@ class BackbonePromptFinetune(nn.Module):
             fe1_pol_for_rgb = self.conv4_pol_for_rgb(\
                             self.conv3_pol_for_rgb(\
                             self.conv2_pol_for_rgb(\
-                            self.conv1_pol_for_rgb(pol)))) + self.prompt
+                            self.conv1_pol_for_rgb(pol))))
 
             fe1_rgb = fe1_rgb + fe1_pol_for_rgb
             fe1_dep = self.conv1_dep(depth)
 
-            fe1_pol_for_dep = self.conv2_pol_for_dep(self.conv1_pol_for_dep(pol)) + self.dep_prompt
+            # fe1_pol_for_dep = self.conv2_pol_for_dep(self.conv1_pol_for_dep(pol)) + self.dep_prompt
 
             fe1 = torch.cat((fe1_rgb, fe1_dep), dim=1)
 

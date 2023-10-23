@@ -1,11 +1,11 @@
 from .completionformer import CompletionFormer
 import torch
 import torch.nn as nn
-from .backbone_prompt_finetune import BackbonePromptFinetune
+from .backbone_early_fusion import BackboneEarlyFusion
 
-class CompletionFormerPromptFinetune(nn.Module):
+class CompletionFormerEarlyFusion(nn.Module):
     def __init__(self, args):
-        super(CompletionFormerPromptFinetune, self).__init__()
+        super(CompletionFormerEarlyFusion, self).__init__()
 
         self.args = args
 
@@ -14,7 +14,7 @@ class CompletionFormerPromptFinetune(nn.Module):
 
         self.prop_time = self.args.prop_time
         self.num_neighbors = self.args.prop_kernel*self.args.prop_kernel - 1
-        self.backbone = BackbonePromptFinetune(args, self.foundation.backbone, mode='rgbd')
+        self.backbone = BackboneEarlyFusion(args, self.foundation.backbone, mode='rgbd')
 
         if self.prop_time > 0:
             self.prop_layer = self.foundation.prop_layer
