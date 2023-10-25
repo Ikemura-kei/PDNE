@@ -50,6 +50,7 @@ from model.completionformer_rgb_scratch.completionformer_rgb_scratch import Comp
 from model.completionformer_early_fusion.completionformer_early_fusion import CompletionFormerEarlyFusion
 from model.completionformer_rgb_scratch.completionformer_rgb_scratch import CompletionFormerRgbScratch
 
+from model.completionformer_early_fusion.completionformer_early_fusion import CompletionFormerEarlyFusion
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
 os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
@@ -101,7 +102,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10009',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10003',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -259,8 +260,7 @@ def train(gpu, args):
 
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
-                
-            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=20, norm_type=2)
+            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=10, norm_type=2)
             optimizer.step()
 
             if gpu == 0:
@@ -457,10 +457,10 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
     if summary_writer is not None:
         for i, metric_name in enumerate(metric.metric_name):
             summary_writer.add_scalar('test/{}'.format(metric_name), metric_avg[i], epoch_idx)
-            current_result[metric_name] = (metric_avg[i].item()).to_list()
+            # current_result[metric_name] = (metric_avg[i].item()).to_list()
         
-    with open(args.save_dir + f'/result_{idx}.json', 'w') as current_json:
-        json.dump(current_result, current_json, indent=4)
+    # with open(args.save_dir + f'/result_{idx}.json', 'w') as current_json:
+    #     json.dump(current_result, current_json, indent=4)
 
     return metric_avg
 

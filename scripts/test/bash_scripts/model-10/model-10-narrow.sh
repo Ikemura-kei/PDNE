@@ -6,7 +6,7 @@ python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
                 --gpus 5 \
                 --loss 1.0*L1+1.0*L2 \
                 --log_dir ./experiments/ \
-                --save model-10 \
+                --save model-10-narrow \
                 --model EarlyFusion \
                 --completionformer_mode rgbd \
                 --pre_pvt \
@@ -15,5 +15,5 @@ python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
                 --use_pol \
                 --pol_rep grayscale-4 \
                 --test_only \
-                --data_percentage 0.2 \
-                --pretrain_list_file ./scripts/test/ckpt_list/model-10.txt
+                --data_percentage 1.0 \
+                --pretrain_list_file ./scripts/test/ckpt_list/model-10/model-10-narrow.txt

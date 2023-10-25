@@ -144,15 +144,18 @@ class BackbonePromptFinetune(nn.Module):
         if self.mode == 'rgbd':
             fe1_rgb = self.conv1_rgb(rgb)
 
-            fe1_pol_for_rgb = self.conv4_pol_for_rgb(\
-                            self.conv3_pol_for_rgb(\
-                            self.conv2_pol_for_rgb(\
-                            self.conv1_pol_for_rgb(pol)))) + self.prompt
+            if self.args.pol_rep == 'grayscale-4':
+                fe1_pol_for_rgb = self.conv4_pol_for_rgb(\
+                                self.conv3_pol_for_rgb(\
+                                self.conv2_pol_for_rgb(\
+                                self.conv1_pol_for_rgb(pol)))) + self.prompt
+            elif self.args.pol_rep == 'leichenyang-7':
+                fe1_pol_for_rgb = self.conv1_pol_for_rgb(pol)+self.prompt
 
             fe1_rgb = fe1_rgb + fe1_pol_for_rgb
             fe1_dep = self.conv1_dep(depth)
 
-            fe1_pol_for_dep = self.conv2_pol_for_dep(self.conv1_pol_for_dep(pol)) + self.dep_prompt
+            # fe1_pol_for_dep = self.conv2_pol_for_dep(self.conv1_pol_for_dep(pol)) + self.dep_prompt
 
             fe1 = torch.cat((fe1_rgb, fe1_dep), dim=1)
 
