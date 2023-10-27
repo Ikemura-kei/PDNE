@@ -47,6 +47,7 @@ os.environ["MASTER_PORT"] = args_config.port
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
+
 best_rmse = 100
 best_mae = 100
 
@@ -239,7 +240,7 @@ def train(gpu, args):
 
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
-            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=10, norm_type=2)
+            # torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=10, norm_type=2)
             optimizer.step()
 
             if gpu == 0:
@@ -249,7 +250,7 @@ def train(gpu, args):
                 log_cnt += 1
                 log_loss += loss_sum.item()
 
-                e_string = f"{(log_loss/log_cnt):.2f}"
+                e_string = f"{(log_loss/log_cnt):.6f}"
                 if batch % args.print_freq == 0:
                     pbar.set_description(e_string)
                     pbar.update(loader_train.batch_size * args.num_gpus)
@@ -333,7 +334,7 @@ def load_pretrain(args, net, ckpt):
 
     return net
 
-def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_writer=None):
+def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_writer=None, result_dict=None, idx=0):
     net = nn.DataParallel(net)
 
     metric = CompletionFormerMetric(args)
@@ -380,6 +381,17 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
             pbar.set_description(error_str)
             pbar.update(loader_test.batch_size)
 
+        metric_dict = {}
+        count = 0
+        for m in metric.metric_name:
+            # print(metric_val[0])
+            metric_dict[m] = metric_val[0][count].detach().cpu().numpy().astype(float).tolist()
+            # print(m, metric_dict[m])
+            count += 1
+        if result_dict is not None:
+            # print(f's{idx+batch}.png')
+            result_dict[f's{idx+batch}.png'] = metric_dict
+
         if batch in save_samples:
             dep = sample['dep'] # in m
             gt = sample['gt'] # in m
@@ -391,15 +403,23 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
                 vis = cv2.applyColorMap(vis, cv2.COLORMAP_JET)
                 return vis
 
-            gt_vis = depth2vis(gt)
-            dep_vis = depth2vis(dep)
-            pred_vis = depth2vis(pred)
+            gt_vis = depth2vis(gt, 2.15)
+            dep_vis = depth2vis(dep, 2.15)
+            pred_vis = depth2vis(pred, 2.15)
+            # -- error map --
+            gt_mask = gt.detach().cpu().numpy()[0].transpose(1,2,0)
+            gt_mask[gt_mask <= 0.001] = 0
+            err = torch.abs(pred-gt)
+
+            error_map_vis = depth2vis(err, 0.55)
+            error_map_vis[np.tile(gt_mask, (1,1,3))==0] = 0
 
             os.makedirs(os.path.join(vis_dir, 'e{}'.format(epoch_idx)), exist_ok=True)
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_gt.png'.format(batch)), gt_vis)
+            cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_err.png'.format(batch)), error_map_vis)
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_pred.png'.format(batch)), pred_vis)
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_dep.png'.format(batch)), dep_vis)
-
+    
     pbar.close()
 
     t_avg = t_total / num_sample
@@ -436,23 +456,53 @@ def test(args):
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'PromptFinetune'])
 
     net.to(0)
+    # -- prepare dataset --
+    data_test = HammerDataset(args, 'test')
+
+    result_dict = {}
+
+    loader_test = DataLoader(dataset=data_test, batch_size=1,
+                             shuffle=False, num_workers=args.num_threads)
+
+    print("------------------------------------------")
+    print("gpu", os.environ["CUDA_VISIBLE_DEVICES"])
+    print("------------------------------------------")
+    net.cuda()
 
     if args.pretrain is not None:
+        summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, 'test', 'logs'))
+
+        
         net = load_pretrain(args, net, args.pretrain)
-        save_samples = np.random.randint(0, len(loader_test), 10)
-        test_one_model(args, net, loader_test, save_samples)
+        # save_samples = np.random.randint(0, len(loader_test), 10)
+        save_samples = np.arange(len(loader_test))
+
+        test_one_model(args, net, loader_test, save_samples, result_dict=result_dict, summary_writer=summary_writer)
+        summary_writer.close()
 
     elif args.pretrain_list_file is not None:
         summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, 'test', 'logs'))
 
         pretrain_list = open(args.pretrain_list_file, 'r').read().split("\n")
-        save_samples = np.random.randint(0, len(loader_test), 3)
-
+        num_samples_to_save = 3 if len(pretrain_list) >= 5 else 50
+        if len(pretrain_list) == 1:
+            save_samples = np.arange(len(loader_test))
+        else:
+            num_samples_to_save = int(len(loader_test) / 40.0)
+            save_samples = np.random.randint(0, len(loader_test), num_samples_to_save)
+        
+        line_idx = 0
         for line in pretrain_list:
             epoch_idx = line.split(" - ")[0]
             ckpt = line.split(" - ")[1]
             net = load_pretrain(args, net, ckpt)
-            test_one_model(args, net, loader_test, save_samples, epoch_idx, summary_writer)
+            test_one_model(args, net, loader_test, save_samples, epoch_idx, summary_writer, result_dict=result_dict, idx=line_idx)
+            line_idx += 1
+        summary_writer.close()
+
+        
+    with open(args.save_dir + '/result.json', 'w') as args_json:
+        json.dump(result_dict, args_json, indent=4)
 
 def main(args):
     init_seed()

@@ -85,8 +85,8 @@ class BackboneEarlyFusion(nn.Module):
             elif self.args.pol_rep == 'leichenyang-7':
                 self.conv1_pol_for_rgb = conv_bn_relu(7, 48, kernel=3, stride=1, padding=1,
                                           bn=False)
-                self.conv1_pol_for_dep = conv_bn_relu(7, 16, kernel=3, stride=1, padding=1,
-                                          bn=False)
+                # self.conv1_pol_for_dep = conv_bn_relu(7, 16, kernel=3, stride=1, padding=1,
+                #                           bn=False)
         elif mode == 'rgb':
             self.conv1 = foundation.conv1
         elif mode == 'd':
@@ -144,10 +144,14 @@ class BackboneEarlyFusion(nn.Module):
         if self.mode == 'rgbd':
             fe1_rgb = self.conv1_rgb(rgb)
 
-            fe1_pol_for_rgb = self.conv4_pol_for_rgb(\
-                            self.conv3_pol_for_rgb(\
-                            self.conv2_pol_for_rgb(\
-                            self.conv1_pol_for_rgb(pol))))
+            if self.args.pol_rep == 'grayscale-4':
+                fe1_pol_for_rgb = self.conv4_pol_for_rgb(\
+                                self.conv3_pol_for_rgb(\
+                                self.conv2_pol_for_rgb(\
+                                self.conv1_pol_for_rgb(pol))))
+            elif self.args.pol_rep == 'leichenyang-7':
+                fe1_pol_for_rgb = self.conv1_pol_for_rgb(pol)
+
 
             fe1_rgb = fe1_rgb + fe1_pol_for_rgb
             fe1_dep = self.conv1_dep(depth)
