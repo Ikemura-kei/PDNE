@@ -35,6 +35,7 @@ from model.completionformer_vpt_v1.completionformer_vpt_v1 import CompletionForm
 from model.completionformer_vpt_v2.completionformer_vpt_v2 import CompletionFormerVPTV2
 from model.completionformer_vpt_v2.completionformer_vpt_v2_1 import CompletionFormerVPTV2_1
 from model.completionformer_prompt_finetune.completionformer_prompt_finetune import CompletionFormerPromptFinetune
+from model.completionformer_prompt.completionformer_prompt import CompletionFormerPrompt
 from model.completionformer_rgb_prompt_finetune.completionformer_rgb_prompt_finetune import CompletionFormerRGBPromptFinetune
 
 from summary.cfsummary import CompletionFormerSummary
@@ -48,7 +49,7 @@ os.environ["MASTER_PORT"] = args_config.port
 # NOTE : Only 1 process per GPU is supported now
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
-
+# torch.autograd.set_detect_anomaly(True)
 best_rmse = 100
 best_mae = 100
 
@@ -89,7 +90,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10001',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10002',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -126,8 +127,10 @@ def train(gpu, args):
         net = CompletionFormerPromptFinetune(args)
     elif args.model == 'RGBPromptFinetune':
         net = CompletionFormerRGBPromptFinetune(args)
+    elif args.model == 'Prompt':
+        net = CompletionFormerPrompt(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune'])
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'Prompt'])
 
     net.cuda(gpu)
 
@@ -244,7 +247,7 @@ def train(gpu, args):
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
                 
-            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=20, norm_type=2)
+            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=4, norm_type=2)
             optimizer.step()
 
             if gpu == 0:
