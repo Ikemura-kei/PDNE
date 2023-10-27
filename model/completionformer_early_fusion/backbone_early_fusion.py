@@ -85,8 +85,8 @@ class BackboneEarlyFusion(nn.Module):
             elif self.args.pol_rep == 'leichenyang-7':
                 self.conv1_pol_for_rgb = conv_bn_relu(7, 48, kernel=3, stride=1, padding=1,
                                           bn=False)
-                self.conv1_pol_for_dep = conv_bn_relu(7, 16, kernel=3, stride=1, padding=1,
-                                          bn=False)
+                # self.conv1_pol_for_dep = conv_bn_relu(7, 16, kernel=3, stride=1, padding=1,
+                #                           bn=False)
         elif mode == 'rgb':
             self.conv1 = foundation.conv1
         elif mode == 'd':

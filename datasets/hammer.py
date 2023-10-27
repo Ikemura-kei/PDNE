@@ -61,7 +61,9 @@ class HammerDataset(BaseDataset):
             elif self.args.pol_rep == 'rgb-12':
                 pass
             elif self.args.pol_rep == 'leichenyang-7':
-                pass
+                # pass
+                pol_folder = 'pol_processed'
+                self.vd = np.load('/root/autodl-tmp/yiming/datasets/polar_hammer/vd.npy')
             self.pol_files = [s.replace("DATA_ROOT", args.dir_data).replace("rgb", pol_folder) for s in files_names] # note that the polarizatins are stored as npy files
         if self.args.use_norm:
             self.norm_files = [s.replace("DATA_ROOT", args.dir_data).replace("rgb", "norm").replace(".png", ".npy") for s in files_names] # note that the normals are stored as npy files
@@ -146,7 +148,16 @@ class HammerDataset(BaseDataset):
             elif self.args.pol_rep == 'rgb-12':
                 pass
             elif self.args.pol_rep == 'leichenyang-7':
-                pass
+                pol = np.load(self.pol_files[idx].replace('.png', '.npy'))
+                pol = pol[::4,::4,...]
+                vd = self.vd[::4, ::4, ...]
+                iun = pol[..., 0:1]
+                rho = pol[..., 1:2]
+                phi = pol[..., 2:3]
+                phi_encode = np.concatenate([np.cos(2 * phi), np.sin(2 * phi)], axis=2)
+                pol = np.concatenate([iun, rho, phi_encode, vd], axis=2)
+                pol = np2tensor(pol) # (7, H, W)
+
     
         # -- apply data augmentation --
         rgb = rgb / 255.0

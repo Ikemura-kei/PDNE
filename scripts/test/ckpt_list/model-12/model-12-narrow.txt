@@ -1,0 +1,6 @@
+52 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_PROMT_FINETUNE/PDNE/experiments/231025_031943_model-12-resnet-freezed/model_00052.pt
+76 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_PROMT_FINETUNE/PDNE/experiments/231025_031943_model-12-resnet-freezed/model_00076.pt
+90 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_PROMT_FINETUNE/PDNE/experiments/231025_031943_model-12-resnet-freezed/model_00090.pt
+116 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_PROMT_FINETUNE/PDNE/experiments/231025_031943_model-12-resnet-freezed/model_00116.pt
+128 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_PROMT_FINETUNE/PDNE/experiments/231025_031943_model-12-resnet-freezed/model_00128.pt
+174 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_PROMT_FINETUNE/PDNE/experiments/231025_031943_model-12-resnet-freezed/model_00174.pt

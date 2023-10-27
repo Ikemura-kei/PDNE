@@ -255,7 +255,9 @@ class PyramidVisionTransformer(nn.Module):
         B = x.shape[0]
 
         embed_l1 = getattr(self, 'embed_layer1')
+        # embed_l1.eval()
         embed_l2 = getattr(self, 'embed_layer2')
+        embed_l2.eval()
 
         x = embed_l1(x)
         outs.append(x)
