@@ -36,6 +36,7 @@ from model.completionformer_vpt_v2.completionformer_vpt_v2 import CompletionForm
 from model.completionformer_vpt_v2.completionformer_vpt_v2_1 import CompletionFormerVPTV2_1
 from model.completionformer_prompt_finetune.completionformer_prompt_finetune import CompletionFormerPromptFinetune
 from model.completionformer_rgb_prompt_finetune.completionformer_rgb_prompt_finetune import CompletionFormerRGBPromptFinetune
+from model.completionformer_prompt_finetune_norm.completionformer_prompt_finetune_norm import CompletionFormerPromptFinetuneNorm
 
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
@@ -48,7 +49,7 @@ os.environ["MASTER_PORT"] = args_config.port
 # NOTE : Only 1 process per GPU is supported now
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
-
+# torch.autograd.set_detect_anomaly(True)
 best_rmse = 100
 best_mae = 100
 
@@ -89,7 +90,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10001',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10004',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -126,8 +127,10 @@ def train(gpu, args):
         net = CompletionFormerPromptFinetune(args)
     elif args.model == 'RGBPromptFinetune':
         net = CompletionFormerRGBPromptFinetune(args)
+    elif args.model == 'PromptFinetuneNorm':
+        net = CompletionFormerPromptFinetuneNorm(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune'])
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'PromptFinetuneNorm'])
 
     net.cuda(gpu)
 
@@ -144,6 +147,10 @@ def train(gpu, args):
     # Loss
     loss = L1L2Loss(args)
     loss.cuda(gpu)
+    
+    if args.use_norm:
+        norm_loss = L1L2Loss(args)
+        norm_loss.cuda(gpu)
 
     # Optimizer
     optimizer, scheduler = train_utils.make_optimizer_scheduler(args, net, len(loader_train))
@@ -234,17 +241,28 @@ def train(gpu, args):
             sample['gt'] = sample['gt'] 
 
             loss_sum, loss_val = loss(sample, output)
+            
+            if args.use_norm:
+                norm_sample = {}
+                norm_output = {}
+                norm_sample['gt'] = sample['norm']
+                norm_output['pred'] = output['norm']
+                norm_loss_sum, norm_loss_val = loss(norm_sample, norm_output)
+                
+                loss_sum = norm_loss_sum + loss_sum
                 
             loss_sum_norm=0
 
             # Divide by batch size
             loss_sum = loss_sum / loader_train.batch_size
             loss_val = loss_val / loader_train.batch_size
+            if args.use_norm:
+                norm_loss_sum = norm_loss_sum / loader_train.batch_size
 
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
                 
-            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=20, norm_type=2)
+            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=4, norm_type=2)
             optimizer.step()
 
             if gpu == 0:
@@ -262,7 +280,7 @@ def train(gpu, args):
         if gpu == 0:
             pbar.close()
 
-            if epoch % 2 == 0:
+            if epoch % 1 == 0:
                 # -- save visualization --
                 folder_name = os.path.join(args.save_dir, "epoch-{}".format(str(epoch)))
                 os.makedirs(folder_name, exist_ok=True)
@@ -273,20 +291,33 @@ def train(gpu, args):
                     vis = ((npy_depth / max_depth) * 255).astype(np.uint8)
                     vis = cv2.applyColorMap(vis, cv2.COLORMAP_JET)
                     return vis
+                
+                def norm_to_colormap(norm):
+                    npy_norm = norm.detach().cpu().numpy().transpose(1,2,0)
+                    vis = ((npy_norm + 1) / 2 * 255).astype(np.uint8)
+                    vis = cv2.cvtColor(vis, cv2.COLOR_RGB2BGR)
+                    return vis
 
                 out = depth_to_colormap(output["pred"][rand_idx], 2.6)
                 gt = depth_to_colormap(sample["gt"][rand_idx], 2.6)
                 sparse = depth_to_colormap(sample["dep"][rand_idx], 2.6)
+                norm_gt = norm_to_colormap(sample["norm"][rand_idx])
+                norm_pred = norm_to_colormap(output["norm"][rand_idx])
 
                 cv2.imwrite(os.path.join(folder_name, "out.png"), out)
                 cv2.imwrite(os.path.join(folder_name, "sparse.png"), sparse)
                 cv2.imwrite(os.path.join(folder_name, "gt.png"), gt)
+                cv2.imwrite(os.path.join(folder_name, "norm_gt.png"), norm_gt)
+                cv2.imwrite(os.path.join(folder_name, "norm_pred.png"), norm_pred)
 
             for i in range(len(loss.loss_name)):
                 writer_train.add_scalar(
                     loss.loss_name[i], total_losses[i] / len(loader_train), epoch)
 
             writer_train.add_scalar('lr', scheduler.get_last_lr()[0], epoch)
+            
+            if args.use_norm:
+                writer_train.add_scalar('norm_loss', norm_loss_sum, epoch)
 
             if ((epoch) % args.save_freq == 0) or epoch==5 or epoch==args.epochs:
                 if args.save_full or epoch == args.epochs:

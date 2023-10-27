@@ -61,10 +61,12 @@ class HammerDataset(BaseDataset):
             elif self.args.pol_rep == 'rgb-12':
                 pass
             elif self.args.pol_rep == 'leichenyang-7':
-                pass
+                pol_folder = 'pol_processed'
+                self.vd = np.load('/root/autodl-tmp/yiming/datasets/polar_hammer/vd.npy')
+
             self.pol_files = [s.replace("DATA_ROOT", args.dir_data).replace("rgb", pol_folder) for s in files_names] # note that the polarizatins are stored as npy files
         if self.args.use_norm:
-            self.norm_files = [s.replace("DATA_ROOT", args.dir_data).replace("rgb", "norm").replace(".png", ".npy") for s in files_names] # note that the normals are stored as npy files
+            self.norm_files = [s.replace("DATA_ROOT", args.dir_data).replace("rgb", "norm") for s in files_names] # note that the normals are stored as npy files
 
     def __len__(self):
         return len(self.rgb_files) * 3
@@ -124,10 +126,12 @@ class HammerDataset(BaseDataset):
 
         # -- prepare normals --
         if self.args.use_norm:
-            norm = np.load(self.norm_files[idx]) # (H, W, 3)
+            norm = cv2.imread(self.norm_files[idx], -1) # (H, W, 3)
+            norm = cv2.cvtColor(norm, cv2.COLOR_BGR2RGB)
+            norm = norm.astype(np.float32) / 255.0 * 2 - 1
             norm = norm[::4,::4,...]
             norm = np2tensor(norm) # (3, H, W)
-
+            
         # -- prepare intrinsics --
         K = self.K.clone()
 
@@ -146,7 +150,15 @@ class HammerDataset(BaseDataset):
             elif self.args.pol_rep == 'rgb-12':
                 pass
             elif self.args.pol_rep == 'leichenyang-7':
-                pass
+                pol = np.load(self.pol_files[idx].replace('.png', '.npy'))
+                pol = pol[::4,::4,...]
+                vd = self.vd[::4, ::4, ...]
+                iun = pol[..., 0:1]
+                rho = pol[..., 1:2]
+                phi = pol[..., 2:3]
+                phi_encode = np.concatenate([np.cos(2 * phi), np.sin(2 * phi)], axis=2)
+                pol = np.concatenate([iun, rho, phi_encode, vd], axis=2)
+                pol = np2tensor(pol) # (7, H, W)
     
         # -- apply data augmentation --
         rgb = rgb / 255.0
