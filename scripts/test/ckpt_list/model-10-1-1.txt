@@ -1,0 +1,9 @@
+50 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_EARLY_FUSION/PDNE/experiments/231026_041319_model-10-1/model_00050.pt
+52 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_EARLY_FUSION/PDNE/experiments/231026_041319_model-10-1/model_00052.pt
+58 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_EARLY_FUSION/PDNE/experiments/231026_041319_model-10-1/model_00058.pt
+64 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_EARLY_FUSION/PDNE/experiments/231026_041319_model-10-1/model_00064.pt
+70 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_EARLY_FUSION/PDNE/experiments/231026_041319_model-10-1/model_00070.pt
+76 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_EARLY_FUSION/PDNE/experiments/231026_041319_model-10-1/model_00076.pt
+82 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_EARLY_FUSION/PDNE/experiments/231026_041319_model-10-1/model_00082.pt
+88 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_EARLY_FUSION/PDNE/experiments/231026_041319_model-10-1/model_00088.pt
+94 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_EARLY_FUSION/PDNE/experiments/231026_041319_model-10-1/model_00094.pt

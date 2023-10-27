@@ -1,9 +1,11 @@
 #! /bin/bash
 
+export CUDA_VISIBLE_DEVICES=7
+
 python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
                 --data_name HAMMER \
                 --data_txt /root/autodl-tmp/yiming/ikemura_ws/PDNE/data_paths/hammer_MODE.txt \
-                --gpus 9,7 \
+                --gpus 7 \
                 --loss 1.0*L1+1.0*L2 \
                 --log_dir ./experiments/ \
                 --save model-6 \
@@ -16,4 +18,4 @@ python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
                 --pretrained_completionformer /root/autodl-tmp/yiming/PDNE/pretrained/comp/NYUv2.pt \
                 --test_only \
                 --data_percentage 0.1 \
-                --pretrain_list_file ./scripts/test/ckpt_list/model-6.txt
+                --pretrain_list_file ./scripts/test/ckpt_list/model-6/model-6.txt

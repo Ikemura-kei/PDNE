@@ -64,6 +64,7 @@ os.environ["MASTER_PORT"] = args_config.port
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
+
 best_rmse = 100
 best_mae = 100
 
@@ -415,6 +416,17 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
             pbar.set_description(error_str)
             pbar.update(loader_test.batch_size)
         
+        metric_dict = {}
+        count = 0
+        for m in metric.metric_name:
+            # print(metric_val[0])
+            metric_dict[m] = metric_val[0][count].detach().cpu().numpy().astype(float).tolist()
+            # print(m, metric_dict[m])
+            count += 1
+        if result_dict is not None:
+            # print(f's{idx+batch}.png')
+            result_dict[f's{idx+batch}.png'] = metric_dict
+
         metric_dict = {}
         count = 0
         for m in metric.metric_name:

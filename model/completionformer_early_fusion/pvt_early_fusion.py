@@ -182,6 +182,8 @@ class PyramidVisionTransformer(nn.Module):
 
         setattr(self, "embed_layer1", foundation.embed_layer1)
         setattr(self, "embed_layer2", foundation.embed_layer2)
+        self.embed_layer2.requires_grad = False
+
         in_chans = 128
 
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
@@ -257,6 +259,7 @@ class PyramidVisionTransformer(nn.Module):
 
         embed_l1 = getattr(self, 'embed_layer1')
         embed_l2 = getattr(self, 'embed_layer2')
+        embed_l2.eval()
 
         x = embed_l1(x)
         outs.append(x)

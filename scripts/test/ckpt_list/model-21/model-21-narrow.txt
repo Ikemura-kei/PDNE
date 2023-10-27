@@ -1,0 +1,3 @@
+10 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_EARLY_FUSION/PDNE/experiments/231026_041319_model-10-1/model_00010.pt
+24 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_EARLY_FUSION/PDNE/experiments/231026_041319_model-10-1/model_00024.pt
+32 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_EARLY_FUSION/PDNE/experiments/231026_041319_model-10-1/model_00032.pt

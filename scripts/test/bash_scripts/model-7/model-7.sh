@@ -1,5 +1,7 @@
 #! /bin/bash
 
+export CUDA_VISIBLE_DEVICES="4,5"
+
 python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
                 --data_name HAMMER \
                 --data_txt /root/autodl-tmp/yiming/ikemura_ws/PDNE/data_paths/hammer_MODE.txt \
