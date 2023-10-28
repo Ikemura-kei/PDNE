@@ -51,6 +51,7 @@ from model.completionformer_early_fusion.completionformer_early_fusion import Co
 from model.completionformer_rgb_scratch.completionformer_rgb_scratch import CompletionFormerRgbScratch
 
 from model.completionformer_early_fusion.completionformer_early_fusion import CompletionFormerEarlyFusion
+from model.completionformer_prompt_finetune_v2.completionformer_prompt_finetune_v2 import CompletionFormerPromptFinetuneV2
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
 os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
@@ -104,7 +105,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10009',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10007',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -147,12 +148,14 @@ def train(gpu, args):
         net = CompletionFormerRgbScratch(args)
     elif args.model == 'EarlyFusion':
         net = CompletionFormerEarlyFusion(args)
+    elif args.model == 'PromptFinetuneV2':
+        net = CompletionFormerPromptFinetuneV2(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'RgbFinetune', 'RgbScratch'])
-    
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'PromptFintuneV2'])
     print("------------------------------------------")
     print("gpu", os.environ["CUDA_VISIBLE_DEVICES"])
     print("------------------------------------------")
+
     net.cuda(gpu)
 
     if gpu == 0:
@@ -511,6 +514,8 @@ def test(args):
         net = CompletionFormerRgbScratch(args)
     elif args.model == 'EarlyFusion':
         net = CompletionFormerEarlyFusion(args)
+    elif args.model == 'PromptFinetuneV2':
+        net = CompletionFormerPromptFinetuneV2(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'PromptFinetune', 'RgbFinetune', 'RGBPromptFinetune', 'RgbScratch'])
 
