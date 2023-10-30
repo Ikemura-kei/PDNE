@@ -1,0 +1,6 @@
+44 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231028_065740_model-15/model_00044.pt
+50 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231028_065740_model-15/model_00050.pt
+56 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231028_065740_model-15/model_00056.pt
+62 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231028_065740_model-15/model_00062.pt
+68 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231028_065740_model-15/model_00068.pt
+74 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231028_065740_model-15/model_00074.pt

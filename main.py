@@ -49,6 +49,7 @@ from model.completionformer_rgb_prompt_finetune.completionformer_rgb_prompt_fine
 from model.completionformer_rgb_scratch.completionformer_rgb_scratch import CompletionFormerRgbScratch
 from model.completionformer_early_fusion.completionformer_early_fusion import CompletionFormerEarlyFusion
 from model.completionformer_rgb_scratch.completionformer_rgb_scratch import CompletionFormerRgbScratch
+from model.completionformer_prompt_finetune_norm.completionformer_prompt_finetune_norm import CompletionFormerPromptFinetuneNorm
 
 from model.completionformer_early_fusion.completionformer_early_fusion import CompletionFormerEarlyFusion
 from model.completionformer_prompt_finetune_v2.completionformer_prompt_finetune_v2 import CompletionFormerPromptFinetuneV2
@@ -105,7 +106,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10007',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10004',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -150,12 +151,14 @@ def train(gpu, args):
         net = CompletionFormerEarlyFusion(args)
     elif args.model == 'PromptFinetuneV2':
         net = CompletionFormerPromptFinetuneV2(args)
+    elif args.model == 'PromptFinetuneNorm':
+        net = CompletionFormerPromptFinetuneNorm(args)
     else:
-        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'PromptFintuneV2'])
+        raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'PromptFinetuneNorm'])
+
     print("------------------------------------------")
     print("gpu", os.environ["CUDA_VISIBLE_DEVICES"])
     print("------------------------------------------")
-
     net.cuda(gpu)
 
     if gpu == 0:
@@ -171,6 +174,10 @@ def train(gpu, args):
     # Loss
     loss = L1L2Loss(args)
     loss.cuda(gpu)
+    
+    if args.use_norm:
+        norm_loss = L1L2Loss(args)
+        norm_loss.cuda(gpu)
 
     # Optimizer
     optimizer, scheduler = train_utils.make_optimizer_scheduler(args, net, len(loader_train))
@@ -261,11 +268,22 @@ def train(gpu, args):
             sample['gt'] = sample['gt'] 
 
             loss_sum, loss_val = loss(sample, output)
+            
+            if args.use_norm:
+                norm_sample = {}
+                norm_output = {}
+                norm_sample['gt'] = sample['norm']
+                norm_output['pred'] = output['norm']
+                norm_loss_sum, norm_loss_val = loss(norm_sample, norm_output)
+                
+                loss_sum = norm_loss_sum + loss_sum
                 
 
             # Divide by batch size
             loss_sum = loss_sum / loader_train.batch_size
             loss_val = loss_val / loader_train.batch_size
+            if args.use_norm:
+                norm_loss_sum = norm_loss_sum / loader_train.batch_size
 
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
@@ -291,7 +309,7 @@ def train(gpu, args):
         if gpu == 0:
             pbar.close()
 
-            if epoch % 2 == 0:
+            if epoch % 1 == 0:
                 # -- save visualization --
                 folder_name = os.path.join(args.save_dir, "epoch-{}".format(str(epoch)))
                 os.makedirs(folder_name, exist_ok=True)
@@ -302,20 +320,33 @@ def train(gpu, args):
                     vis = ((npy_depth / max_depth) * 255).astype(np.uint8)
                     vis = cv2.applyColorMap(vis, cv2.COLORMAP_JET)
                     return vis
+                
+                def norm_to_colormap(norm):
+                    npy_norm = norm.detach().cpu().numpy().transpose(1,2,0)
+                    vis = ((npy_norm + 1) / 2 * 255).astype(np.uint8)
+                    vis = cv2.cvtColor(vis, cv2.COLOR_RGB2BGR)
+                    return vis
 
                 out = depth_to_colormap(output["pred"][rand_idx], 2.6)
                 gt = depth_to_colormap(sample["gt"][rand_idx], 2.6)
                 sparse = depth_to_colormap(sample["dep"][rand_idx], 2.6)
+                norm_gt = norm_to_colormap(sample["norm"][rand_idx])
+                norm_pred = norm_to_colormap(output["norm"][rand_idx])
 
                 cv2.imwrite(os.path.join(folder_name, "out.png"), out)
                 cv2.imwrite(os.path.join(folder_name, "sparse.png"), sparse)
                 cv2.imwrite(os.path.join(folder_name, "gt.png"), gt)
+                cv2.imwrite(os.path.join(folder_name, "norm_gt.png"), norm_gt)
+                cv2.imwrite(os.path.join(folder_name, "norm_pred.png"), norm_pred)
 
             for i in range(len(loss.loss_name)):
                 writer_train.add_scalar(
                     loss.loss_name[i], total_losses[i] / len(loader_train), epoch)
 
             writer_train.add_scalar('lr', scheduler.get_last_lr()[0], epoch)
+            
+            if args.use_norm:
+                writer_train.add_scalar('norm_loss', norm_loss_sum, epoch)
 
             if ((epoch) % args.save_freq == 0) or epoch==5 or epoch==args.epochs:
                 if args.save_full or epoch == args.epochs:
@@ -445,16 +476,31 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
             dep = sample['dep'] # in m
             gt = sample['gt'] # in m
             pred = output['pred'] # in m
+            if args.use_norm:
+                norm_gt = sample['norm']
+                norm_pred = output['norm']
+                # print(norm_gt.shape)
+                # print(norm_pred.shape)
 
             def depth2vis(depth, MAX_DEPTH=2.15):
                 depth = depth.detach().cpu().numpy()[0].transpose(1,2,0)
                 vis = ((depth / MAX_DEPTH) * 255).astype(np.uint8)
                 vis = cv2.applyColorMap(vis, cv2.COLORMAP_JET)
                 return vis
+            
+            def norm2vis(norm):
+                npy_norm = norm.detach().cpu().numpy()[0].transpose(1,2,0)
+                vis = ((npy_norm + 1) / 2 * 255).astype(np.uint8)
+                vis = cv2.cvtColor(vis, cv2.COLOR_RGB2BGR)
+                return vis
 
             gt_vis = depth2vis(gt, 2.15)
             dep_vis = depth2vis(dep, 2.15)
             pred_vis = depth2vis(pred, 2.15)
+            if args.use_norm:
+                gt_norm_vis = norm2vis(norm_gt)
+                pred_norm_vis = norm2vis(norm_pred)
+            
             # -- error map --
             gt_mask = gt.detach().cpu().numpy()[0].transpose(1,2,0)
             gt_mask[gt_mask <= 0.001] = 0
@@ -465,6 +511,9 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
 
             os.makedirs(os.path.join(vis_dir, 'e{}'.format(epoch_idx)), exist_ok=True)
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_gt.png'.format(batch)), gt_vis)
+            if args.use_norm:
+                cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_norm_gt.png'.format(batch)), gt_norm_vis)
+                cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_norm_pred.png'.format(batch)), pred_norm_vis)
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_err.png'.format(batch)), error_map_vis)
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_pred.png'.format(batch)), pred_vis)
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_dep.png'.format(batch)), dep_vis)
@@ -516,6 +565,8 @@ def test(args):
         net = CompletionFormerEarlyFusion(args)
     elif args.model == 'PromptFinetuneV2':
         net = CompletionFormerPromptFinetuneV2(args)
+    elif args.model == 'PromptFinetuneNorm':
+        net = CompletionFormerPromptFinetuneNorm(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'PromptFinetune', 'RgbFinetune', 'RGBPromptFinetune', 'RgbScratch'])
 
