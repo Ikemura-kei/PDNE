@@ -37,6 +37,7 @@ from model.completionformer_vpt_v2.completionformer_vpt_v2_1 import CompletionFo
 from model.completionformer_prompt_finetune.completionformer_prompt_finetune import CompletionFormerPromptFinetune
 from model.completionformer_rgb_prompt_finetune.completionformer_rgb_prompt_finetune import CompletionFormerRGBPromptFinetune
 from model.completionformer_prompt_finetune_norm.completionformer_prompt_finetune_norm import CompletionFormerPromptFinetuneNorm
+from model.completionformer_polar_norm.completionformer_polar_norm import CompletionFormerPolarNorm
 
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
@@ -90,7 +91,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10004',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10001',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -129,6 +130,8 @@ def train(gpu, args):
         net = CompletionFormerRGBPromptFinetune(args)
     elif args.model == 'PromptFinetuneNorm':
         net = CompletionFormerPromptFinetuneNorm(args)
+    elif args.model == 'PolarNormScratch':
+        net = CompletionFormerPolarNorm(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'PromptFinetuneNorm'])
 
