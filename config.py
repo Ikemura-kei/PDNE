@@ -171,6 +171,10 @@ parser.add_argument('--loss',
                     type=str,
                     default='1.0*L1+1.0*L2',
                     help='loss function configuration')
+parser.add_argument('--use_cosine_loss',
+                    action='store_true',
+                    default=False,
+                    help='whether to use cosine similarity loss for normal supervision')
 parser.add_argument('--l1_weight',
                     type=float,
                     default=1.0)

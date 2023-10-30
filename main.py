@@ -50,6 +50,7 @@ from model.completionformer_rgb_scratch.completionformer_rgb_scratch import Comp
 from model.completionformer_early_fusion.completionformer_early_fusion import CompletionFormerEarlyFusion
 from model.completionformer_rgb_scratch.completionformer_rgb_scratch import CompletionFormerRgbScratch
 from model.completionformer_prompt_finetune_norm.completionformer_prompt_finetune_norm import CompletionFormerPromptFinetuneNorm
+from model.completionformer_polar_norm.completionformer_polar_norm import CompletionFormerPolarNorm
 
 from model.completionformer_early_fusion.completionformer_early_fusion import CompletionFormerEarlyFusion
 from model.completionformer_prompt_finetune_v2.completionformer_prompt_finetune_v2 import CompletionFormerPromptFinetuneV2
@@ -106,7 +107,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10004',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10001',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -153,6 +154,8 @@ def train(gpu, args):
         net = CompletionFormerPromptFinetuneV2(args)
     elif args.model == 'PromptFinetuneNorm':
         net = CompletionFormerPromptFinetuneNorm(args)
+    elif args.model == 'PolarNormScratch':
+        net = CompletionFormerPolarNorm(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'PromptFinetuneNorm'])
 
@@ -176,7 +179,7 @@ def train(gpu, args):
     loss.cuda(gpu)
     
     if args.use_norm:
-        norm_loss = L1L2Loss(args)
+        norm_loss = torch.nn.L1Loss(reduction='none') if not args.use_cosine_loss else torch.nn.CosineSimilarity(dim=1)
         norm_loss.cuda(gpu)
 
     # Optimizer
@@ -274,7 +277,14 @@ def train(gpu, args):
                 norm_output = {}
                 norm_sample['gt'] = sample['norm']
                 norm_output['pred'] = output['norm']
-                norm_loss_sum, norm_loss_val = loss(norm_sample, norm_output)
+                # if not args.use_cosine_loss:
+                #     norm_loss_sum, norm_loss_val = norm_loss(norm_sample, norm_output)
+                # else:
+                loss_raw = torch.sum(norm_loss(norm_sample['gt'] + 1, norm_output['pred'] + 1), dim=1)
+                # print(loss_raw.shape)
+                norm_loss_sum = torch.sum(torch.mean(loss_raw, dim=(1,2)))
+                print("norm_loss_sum:", norm_loss_sum)
+                print("norm range, min {}, max {}".format(torch.min(norm_output['pred']), torch.max(norm_output['pred'])))
                 
                 loss_sum = norm_loss_sum + loss_sum
                 
@@ -322,6 +332,7 @@ def train(gpu, args):
                     return vis
                 
                 def norm_to_colormap(norm):
+                    norm = torch.nn.functional.normalize(norm, dim=0)
                     npy_norm = norm.detach().cpu().numpy().transpose(1,2,0)
                     vis = ((npy_norm + 1) / 2 * 255).astype(np.uint8)
                     vis = cv2.cvtColor(vis, cv2.COLOR_RGB2BGR)
@@ -331,6 +342,7 @@ def train(gpu, args):
                 gt = depth_to_colormap(sample["gt"][rand_idx], 2.6)
                 sparse = depth_to_colormap(sample["dep"][rand_idx], 2.6)
                 norm_gt = norm_to_colormap(sample["norm"][rand_idx])
+                print("min norm: {}, max norm: {}".format(torch.min(output["norm"]), torch.max(output["norm"])))
                 norm_pred = norm_to_colormap(output["norm"][rand_idx])
 
                 cv2.imwrite(os.path.join(folder_name, "out.png"), out)
