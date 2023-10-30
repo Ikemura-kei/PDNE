@@ -23,5 +23,6 @@ python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
                 --pretrained_completionformer /root/autodl-tmp/yiming/PDNE/pretrained/comp/NYUv2.pt \
                 --use_pol \
                 --use_norm \
+                --use_cosine_loss \
                 --pol_rep leichenyang-7 \
-                --resume --pretrain /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231028_192905_model-15/model_00010.pt \
+                # --resume --pretrain /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231022_221423_model-15/model_00008.pt \

@@ -149,7 +149,7 @@ def train(gpu, args):
     loss.cuda(gpu)
     
     if args.use_norm:
-        norm_loss = L1L2Loss(args)
+        norm_loss = torch.nn.L1Loss(reduction='none') if not args.use_cosine_loss else torch.nn.CosineSimilarity(dim=1)
         norm_loss.cuda(gpu)
 
     # Optimizer
@@ -247,7 +247,14 @@ def train(gpu, args):
                 norm_output = {}
                 norm_sample['gt'] = sample['norm']
                 norm_output['pred'] = output['norm']
-                norm_loss_sum, norm_loss_val = loss(norm_sample, norm_output)
+                # if not args.use_cosine_loss:
+                #     norm_loss_sum, norm_loss_val = norm_loss(norm_sample, norm_output)
+                # else:
+                loss_raw = torch.sum(norm_loss(norm_sample['gt'] + 1, norm_output['pred'] + 1), dim=1)
+                # print(loss_raw.shape)
+                norm_loss_sum = torch.sum(torch.mean(loss_raw, dim=(1,2)))
+                print("norm_loss_sum:", norm_loss_sum)
+                print("norm range, min {}, max {}".format(torch.min(norm_output['pred']), torch.max(norm_output['pred'])))
                 
                 loss_sum = norm_loss_sum + loss_sum
                 
@@ -293,6 +300,7 @@ def train(gpu, args):
                     return vis
                 
                 def norm_to_colormap(norm):
+                    norm = torch.nn.functional.normalize(norm, dim=0)
                     npy_norm = norm.detach().cpu().numpy().transpose(1,2,0)
                     vis = ((npy_norm + 1) / 2 * 255).astype(np.uint8)
                     vis = cv2.cvtColor(vis, cv2.COLOR_RGB2BGR)
@@ -302,6 +310,7 @@ def train(gpu, args):
                 gt = depth_to_colormap(sample["gt"][rand_idx], 2.6)
                 sparse = depth_to_colormap(sample["dep"][rand_idx], 2.6)
                 norm_gt = norm_to_colormap(sample["norm"][rand_idx])
+                print("min norm: {}, max norm: {}".format(torch.min(output["norm"]), torch.max(output["norm"])))
                 norm_pred = norm_to_colormap(output["norm"][rand_idx])
 
                 cv2.imwrite(os.path.join(folder_name, "out.png"), out)
