@@ -181,7 +181,9 @@ parser.add_argument('--l1_weight',
 parser.add_argument('--l2_weight',
                     type=float,
                     default=1.0)
-
+parser.add_argument('--normal_loss_weight',
+                    type=float,
+                    default=1.0)
 parser.add_argument('--epochs',
                     type=int,
                     default=72,

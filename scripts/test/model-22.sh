@@ -1,7 +1,3 @@
-#! /bin/bash
-
-# iun + rho + phi + vd
-
 export CUDA_VISIBLE_DEVICES="4,5"
 
 python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
@@ -12,7 +8,7 @@ python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
                 --batch_size 14 \
                 --epochs 100 \
                 --log_dir ./experiments/ \
-                --save model-15 \
+                --save model-22 \
                 --model PromptFinetuneNorm \
                 --completionformer_mode rgbd \
                 --pre_pvt \
@@ -24,5 +20,7 @@ python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
                 --use_pol \
                 --use_norm \
                 --use_cosine_loss \
-                --pol_rep leichenyang-7
-                # --resume --pretrain /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231022_221423_model-15/model_00008.pt \
+                --data_percentage 1 \
+                --test_only \
+                --pol_rep leichenyang-7 \
+                --pretrain_list_file ./scripts/test/ckpt_list/model-22-2.txt

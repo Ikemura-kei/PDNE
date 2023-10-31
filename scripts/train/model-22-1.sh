@@ -10,9 +10,9 @@ python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
                 --gpus 4,5 \
                 --loss 1.0*L1+1.0*L2 \
                 --batch_size 14 \
-                --epochs 100 \
+                --epochs 250 \
                 --log_dir ./experiments/ \
-                --save model-15 \
+                --save model-22-1 \
                 --model PromptFinetuneNorm \
                 --completionformer_mode rgbd \
                 --pre_pvt \
