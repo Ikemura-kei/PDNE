@@ -149,7 +149,7 @@ def train(gpu, args):
     loss.cuda(gpu)
     
     if args.use_norm:
-        norm_loss = L1L2Loss(args)
+        norm_loss = torch.nn.L1Loss(reduction='none') if not args.use_cosine_loss else torch.nn.CosineSimilarity(dim=1)
         norm_loss.cuda(gpu)
 
     # Optimizer
@@ -247,9 +247,13 @@ def train(gpu, args):
                 norm_output = {}
                 norm_sample['gt'] = sample['norm']
                 norm_output['pred'] = output['norm']
-                norm_loss_sum, norm_loss_val = loss(norm_sample, norm_output)
+               
+                # print(norm_sample['gt'].shape)
+                loss_raw = norm_loss(norm_sample['gt'] + 1, norm_output['pred'] + 1)
+                # print(loss_raw.shape)
+                norm_loss_sum = torch.sum(torch.mean(loss_raw, dim=(1,2)))
                 
-                loss_sum = norm_loss_sum + loss_sum
+                loss_sum = norm_loss_sum*args.normal_loss_weight + loss_sum
                 
             loss_sum_norm=0
 
@@ -293,6 +297,7 @@ def train(gpu, args):
                     return vis
                 
                 def norm_to_colormap(norm):
+                    norm = torch.nn.functional.normalize(norm, dim=0)
                     npy_norm = norm.detach().cpu().numpy().transpose(1,2,0)
                     vis = ((npy_norm + 1) / 2 * 255).astype(np.uint8)
                     vis = cv2.cvtColor(vis, cv2.COLOR_RGB2BGR)
@@ -302,6 +307,7 @@ def train(gpu, args):
                 gt = depth_to_colormap(sample["gt"][rand_idx], 2.6)
                 sparse = depth_to_colormap(sample["dep"][rand_idx], 2.6)
                 norm_gt = norm_to_colormap(sample["norm"][rand_idx])
+                print("min norm: {}, max norm: {}".format(torch.min(output["norm"]), torch.max(output["norm"])))
                 norm_pred = norm_to_colormap(output["norm"][rand_idx])
 
                 cv2.imwrite(os.path.join(folder_name, "out.png"), out)
@@ -313,7 +319,7 @@ def train(gpu, args):
             for i in range(len(loss.loss_name)):
                 writer_train.add_scalar(
                     loss.loss_name[i], total_losses[i] / len(loader_train), epoch)
-
+                
             writer_train.add_scalar('lr', scheduler.get_last_lr()[0], epoch)
             
             if args.use_norm:
@@ -470,6 +476,8 @@ def test(args):
         net = CompletionFormerPromptFinetune(args)
     elif args.model == 'RGBPromptFinetune':
         net = CompletionFormerRGBPromptFinetune(args)
+    elif args.model == 'PromptFinetuneNorm':
+        net = CompletionFormerPromptFinetuneNorm(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'PromptFinetune', 'RGBPromptFinetune'])
 
