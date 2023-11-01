@@ -37,6 +37,7 @@ from model.completionformer_vpt_v2.completionformer_vpt_v2_1 import CompletionFo
 from model.completionformer_prompt_finetune.completionformer_prompt_finetune import CompletionFormerPromptFinetune
 from model.completionformer_rgb_prompt_finetune.completionformer_rgb_prompt_finetune import CompletionFormerRGBPromptFinetune
 from model.completionformer_prompt_finetune_norm.completionformer_prompt_finetune_norm import CompletionFormerPromptFinetuneNorm
+from model.completionformer_finetune_norm_direct.completionformer_finetune_norm_direct import CompletionFormerFinetuneNormDirect 
 
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
@@ -81,6 +82,18 @@ def check_args(args):
             new_args.layer0=False
             new_args.save_freq = 2
 
+    camera_matrix_txt = open(args.camera_matrix_file, 'r').read().split("\n")[:-1]
+    camera_matrix = []
+    for line in camera_matrix_txt:
+        for value in line.split(' '):
+            camera_matrix.append(value)
+            
+    K = [[float(camera_matrix[0]) / 4.0, float(camera_matrix[1]), float(camera_matrix[2]) / 4.0], 
+         [float(camera_matrix[3]), float(camera_matrix[4]) / 4.0, float(camera_matrix[5]) / 4.0], 
+         [float(camera_matrix[6]), float(camera_matrix[7]), float(camera_matrix[8])]]
+    K = np.array(K)
+    new_args.camera_matrix = K
+    print("Camera matrix is \n{}".format(new_args.camera_matrix))
     return new_args
 
 
@@ -90,7 +103,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10004',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10008',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -129,9 +142,12 @@ def train(gpu, args):
         net = CompletionFormerRGBPromptFinetune(args)
     elif args.model == 'PromptFinetuneNorm':
         net = CompletionFormerPromptFinetuneNorm(args)
+    elif args.model == 'CompletionFormerFinetuneNormDirect':
+        net = CompletionFormerFinetuneNormDirect(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'PromptFinetuneNorm'])
 
+    args.camera_matrix = None
     net.cuda(gpu)
 
     if gpu == 0:
@@ -167,7 +183,7 @@ def train(gpu, args):
                     optimizer.load_state_dict(checkpoint['optimizer'])
                     scheduler.load_state_dict(checkpoint['scheduler'])
                     amp.load_state_dict(checkpoint['amp'])
-                    init_epoch = checkpoint['epoch']
+                    init_epoch = checkpoint['epoch'] + 1
 
                     print('Resume optimizer, scheduler and amp '
                           'from : {}'.format(args.pretrain))
@@ -253,7 +269,9 @@ def train(gpu, args):
                 # print(loss_raw.shape)
                 norm_loss_sum = torch.sum(torch.mean(loss_raw, dim=(1,2)))
                 
-                loss_sum = norm_loss_sum*args.normal_loss_weight + loss_sum
+                weighted_loss_norm = norm_loss_sum * (args.normal_loss_weight if loss_sum.item() / loader_train.batch_size < 0.031 else 0)
+                print("Depth loss: {}, normal loss: {}".format(loss_sum.item() / loader_train.batch_size, weighted_loss_norm.item() / loader_train.batch_size))
+                loss_sum = weighted_loss_norm + loss_sum
                 
             loss_sum_norm=0
 
@@ -315,6 +333,8 @@ def train(gpu, args):
                 cv2.imwrite(os.path.join(folder_name, "gt.png"), gt)
                 cv2.imwrite(os.path.join(folder_name, "norm_gt.png"), norm_gt)
                 cv2.imwrite(os.path.join(folder_name, "norm_pred.png"), norm_pred)
+                cv2.imwrite(os.path.join(folder_name, "depth_pred.png"), (output["pred"][rand_idx].detach().cpu().numpy()[0] * 1000.0).astype(np.uint16))
+                cv2.imwrite(os.path.join(folder_name, "depth_gt.png"), (sample["gt"][rand_idx].detach().cpu().numpy()[0] * 1000.0).astype(np.uint16))
 
             for i in range(len(loss.loss_name)):
                 writer_train.add_scalar(

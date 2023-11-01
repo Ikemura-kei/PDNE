@@ -181,6 +181,8 @@ class PyramidVisionTransformer(nn.Module):
         net = get_resnet34(pretrained=True)
         setattr(self, "embed_layer1", net.layer1)
         setattr(self, "embed_layer2", net.layer2)
+        for params in self.embed_layer2.parameters():
+            params.requires_grad = False
         del net
         in_chans = 128
 
@@ -242,11 +244,19 @@ class PyramidVisionTransformer(nn.Module):
 
         B = x.shape[0]
 
-        x = getattr(self, 'embed_layer1')(x)
-        outs.append(x)
-        x = getattr(self, 'embed_layer2')(x)
-        outs.append(x)
+        # print("Is x0 NaN? {}".format(torch.any(torch.isnan(x))))
 
+        x = getattr(self, 'embed_layer1')(x)
+        # print("Is x1 NaN? {}".format(torch.any(torch.isnan(x))))
+        outs.append(x)
+        self.embed_layer2.eval()
+        x = getattr(self, 'embed_layer2')(x)
+        # print("Is x2 NaN? {}".format(torch.any(torch.isnan(x))))
+        
+        outs.append(x)
+        
+        if torch.any(torch.isnan(x)):
+            exit()
 
         for i in range(self.num_stages):
             patch_embed = getattr(self, f"patch_embed{i + 1}")

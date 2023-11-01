@@ -21,6 +21,8 @@ parser.add_argument('--dir_data',
                     type=str,
                     default='./dataset/NYUDepthV2_HDF5',
                     help='path to dataset')
+parser.add_argument('--camera_matrix_file', type=str, help='a txt file containing the camera intrinsic matrix of 3x3')
+parser.add_argument('--camera_matrix')
 parser.add_argument('--data_name',
                     type=str,
                     default='NYU',

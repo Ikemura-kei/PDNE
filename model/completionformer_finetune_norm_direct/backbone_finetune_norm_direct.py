@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .resnet_cbam import BasicBlock
-from .pvt_prompt_finetune import PVTPromptFinetune
+from .pvt import PVT
 from .backbone import Backbone
 
 
@@ -41,9 +41,9 @@ def convt_bn_relu(ch_in, ch_out, kernel, stride=1, padding=0, output_padding=0,
 
     return layers
 
-class BackbonePromptFinetuneNorm(nn.Module):
+class BackboneFinetuneNormDirect(nn.Module):
     def __init__(self, args, foundation, mode='rgbd'):
-        super(BackbonePromptFinetuneNorm, self).__init__()
+        super(BackboneFinetuneNormDirect, self).__init__()
         self.args = args
         self.mode = mode
         self.num_neighbors = self.args.prop_kernel*self.args.prop_kernel - 1
@@ -55,14 +55,10 @@ class BackbonePromptFinetuneNorm(nn.Module):
         # Encoder
         if mode == 'rgbd':
             self.conv1_rgb = foundation.conv1_rgb
+            # for params in self.conv1_rgb.parameters():
+            #     params.requires_grad = False
             self.conv1_dep = foundation.conv1_dep
             self.conv1 = foundation.conv1
-            # -- the following two are the only updating layers --
-            self.prompt = nn.Parameter(torch.zeros([1, 48, 208, 272])) # TODO: make the dimensions flexible
-            nn.init.uniform_(self.prompt)
-
-            self.dep_prompt = nn.Parameter(torch.zeros([1, 16, 208, 272])) # TODO: make the dimensions flexible
-            nn.init.uniform_(self.dep_prompt)
 
             if self.args.pol_rep == 'grayscale-4':
                 self.conv1_pol_for_rgb = conv_bn_relu(4, 16, kernel=3, stride=1, padding=1,
@@ -95,7 +91,7 @@ class BackbonePromptFinetuneNorm(nn.Module):
             raise TypeError(mode)
         
         # self.former = foundation.former
-        self.former = PVTPromptFinetune(in_chans=64, patch_size=2, pretrained='./model/completionformer_original/pretrained/pvt.pth', foundation=foundation.former)
+        self.former = PVT(in_chans=64, patch_size=2, pretrained='./model/completionformer_original/pretrained/pvt.pth')
 
         # Shared Decoder
         # 1/16
@@ -115,12 +111,6 @@ class BackbonePromptFinetuneNorm(nn.Module):
         # 1/1
         self.dep_dec1 = foundation.dep_dec1
         self.dep_dec0 = foundation.dep_dec0
-        
-        # Normal Branch
-        self.norm_dec1 = conv_bn_relu(64+64, 64, kernel=3, stride=1,
-                                     padding=1)
-        self.norm_dec0 = conv_bn_relu(64+64, 3, kernel=3, stride=1,
-                                     padding=1, bn=False, relu=True)
         
         # Guidance Branch
         # 1/1
@@ -149,20 +139,24 @@ class BackbonePromptFinetuneNorm(nn.Module):
         B = rgb.shape[0]
         # Encoding
         if self.mode == 'rgbd':
+            # self.conv1_rgb.eval()
+            # print("Is rgb NaN? {}".format(torch.any(torch.isnan(rgb))))
             fe1_rgb = self.conv1_rgb(rgb)
+            # print("Is fe1_rgb NaN? {}".format(torch.any(torch.isnan(fe1_rgb))))
 
             if self.args.pol_rep == 'grayscale-4':
                 fe1_pol_for_rgb = self.conv4_pol_for_rgb(\
                                 self.conv3_pol_for_rgb(\
                                 self.conv2_pol_for_rgb(\
-                                self.conv1_pol_for_rgb(pol)))) + self.prompt
+                                self.conv1_pol_for_rgb(pol)))) 
             elif self.args.pol_rep == 'leichenyang-7':
-                fe1_pol_for_rgb = self.conv1_pol_for_rgb(pol)+self.prompt
+                fe1_pol_for_rgb = self.conv1_pol_for_rgb(pol)
+                # print("Is fe1_pol_for_rgb NaN? {}".format(torch.any(torch.isnan(fe1_pol_for_rgb))))
 
             fe1_rgb = fe1_rgb + fe1_pol_for_rgb
+            # print("Is fe1_rgb post NaN? {}".format(torch.any(torch.isnan(fe1_rgb))))
             fe1_dep = self.conv1_dep(depth)
-
-            # fe1_pol_for_dep = self.conv2_pol_for_dep(self.conv1_pol_for_dep(pol)) + self.dep_prompt
+            # print("Is fe1_dep NaN? {}".format(torch.any(torch.isnan(fe1_dep))))
 
             fe1 = torch.cat((fe1_rgb, fe1_dep), dim=1)
 
@@ -186,11 +180,6 @@ class BackbonePromptFinetuneNorm(nn.Module):
         # Init Depth Decoding
         dep_fd1 = self.dep_dec1(self._concat(fd2, fe2))
         init_depth = self.dep_dec0(self._concat(dep_fd1, fe1))
-        
-        # Surface Normal Decoding
-        norm_fd1 = self.norm_dec1(self._concat(fd2, fe2))
-        norm = self.norm_dec0(self._concat(norm_fd1, fe1))
-        # norm = torch.nn.functional.normalize(norm, dim=1)
 
         # Guidance Decoding
         gd_fd1 = self.gd_dec1(self._concat(fd2, fe2))
@@ -203,5 +192,5 @@ class BackbonePromptFinetuneNorm(nn.Module):
         else:
             confidence = None
 
-        return init_depth, guide, confidence, norm
+        return init_depth, guide, confidence
 

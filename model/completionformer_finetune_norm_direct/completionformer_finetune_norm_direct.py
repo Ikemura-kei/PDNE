@@ -1,20 +1,23 @@
 from .completionformer import CompletionFormer
 import torch
 import torch.nn as nn
-from .backbone_prompt_finetune_norm import BackbonePromptFinetuneNorm
+from .backbone_finetune_norm_direct import BackboneFinetuneNormDirect
+from model.depth2norm.depth2norm import depth2norm
 
-class CompletionFormerPromptFinetuneNorm(nn.Module):
+class CompletionFormerFinetuneNormDirect(nn.Module):
     def __init__(self, args):
-        super(CompletionFormerPromptFinetuneNorm, self).__init__()
+        super(CompletionFormerFinetuneNormDirect, self).__init__()
 
         self.args = args
+        self.camera_matrix = args.camera_matrix
+        print("Camera matrix is \n{}".format(self.camera_matrix))
 
         self.foundation = CompletionFormer(args)
         self.foundation.load_state_dict(torch.load(args.pretrained_completionformer, map_location='cpu')['net'])
 
         self.prop_time = self.args.prop_time
         self.num_neighbors = self.args.prop_kernel*self.args.prop_kernel - 1
-        self.backbone = BackbonePromptFinetuneNorm(args, self.foundation.backbone, mode='rgbd')
+        self.backbone = BackboneFinetuneNormDirect(args, self.foundation.backbone, mode='rgbd')
 
         if self.prop_time > 0:
             self.prop_layer = self.foundation.prop_layer
@@ -24,7 +27,7 @@ class CompletionFormerPromptFinetuneNorm(nn.Module):
         dep = sample['dep']
         pol = sample['pol']
 
-        pred_init, guide, confidence, norm = self.backbone(rgb, dep, pol)
+        pred_init, guide, confidence = self.backbone(rgb, dep, pol)
         pred_init = pred_init + dep
         
         # -- difussion --
@@ -45,6 +48,8 @@ class CompletionFormerPromptFinetuneNorm(nn.Module):
         conf_inter.reverse()
         if not self.args.conf_prop:
             conf_inter = None
+            
+        norm = depth2norm(y, self.camera_matrix, computation_mode='vectorized')
 
         output = {'pred': y, 'pred_init': pred_init, 'pred_inter': y_inter,
                   'guidance': guide, 'offset': offset, 'aff': aff,
