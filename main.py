@@ -51,6 +51,7 @@ from model.completionformer_early_fusion.completionformer_early_fusion import Co
 from model.completionformer_rgb_scratch.completionformer_rgb_scratch import CompletionFormerRgbScratch
 from model.completionformer_prompt_finetune_norm.completionformer_prompt_finetune_norm import CompletionFormerPromptFinetuneNorm
 from model.completionformer_polar_norm.completionformer_polar_norm import CompletionFormerPolarNorm
+from model.completionformer_finetune_norm_direct.completionformer_finetune_norm_direct import CompletionFormerFinetuneNormDirect 
 
 from model.completionformer_early_fusion.completionformer_early_fusion import CompletionFormerEarlyFusion
 from model.completionformer_prompt_finetune_v2.completionformer_prompt_finetune_v2 import CompletionFormerPromptFinetuneV2
@@ -99,6 +100,18 @@ def check_args(args):
             new_args.layer0=False
             new_args.save_freq = 2
 
+    camera_matrix_txt = open(args.camera_matrix_file, 'r').read().split("\n")[:-1]
+    camera_matrix = []
+    for line in camera_matrix_txt:
+        for value in line.split(' '):
+            camera_matrix.append(value)
+            
+    K = [[float(camera_matrix[0]) / 4.0, float(camera_matrix[1]), float(camera_matrix[2]) / 4.0], 
+         [float(camera_matrix[3]), float(camera_matrix[4]) / 4.0, float(camera_matrix[5]) / 4.0], 
+         [float(camera_matrix[6]), float(camera_matrix[7]), float(camera_matrix[8])]]
+    K = np.array(K)
+    new_args.camera_matrix = K
+    print("Camera matrix is \n{}".format(new_args.camera_matrix))
     return new_args
 
 def train(gpu, args):
@@ -156,12 +169,16 @@ def train(gpu, args):
         net = CompletionFormerPromptFinetuneNorm(args)
     elif args.model == 'PolarNormScratch':
         net = CompletionFormerPolarNorm(args)
+    elif args.model == 'CompletionFormerFinetuneNormDirect':
+        net = CompletionFormerFinetuneNormDirect(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'PromptFinetuneNorm'])
 
     print("------------------------------------------")
     print("gpu", os.environ["CUDA_VISIBLE_DEVICES"])
     print("------------------------------------------")
+
+    args.camera_matrix = None
     net.cuda(gpu)
 
     if gpu == 0:
@@ -197,7 +214,7 @@ def train(gpu, args):
                     optimizer.load_state_dict(checkpoint['optimizer'])
                     scheduler.load_state_dict(checkpoint['scheduler'])
                     amp.load_state_dict(checkpoint['amp'])
-                    init_epoch = checkpoint['epoch']
+                    init_epoch = checkpoint['epoch'] + 1
 
                     print('Resume optimizer, scheduler and amp '
                           'from : {}'.format(args.pretrain))
@@ -277,16 +294,15 @@ def train(gpu, args):
                 norm_output = {}
                 norm_sample['gt'] = sample['norm']
                 norm_output['pred'] = output['norm']
-                # if not args.use_cosine_loss:
-                #     norm_loss_sum, norm_loss_val = norm_loss(norm_sample, norm_output)
-                # else:
-                loss_raw = torch.sum(norm_loss(norm_sample['gt'] + 1, norm_output['pred'] + 1), dim=1)
+               
+                # print(norm_sample['gt'].shape)
+                loss_raw = norm_loss(norm_sample['gt'] + 1, norm_output['pred'] + 1)
                 # print(loss_raw.shape)
                 norm_loss_sum = torch.sum(torch.mean(loss_raw, dim=(1,2)))
-                print("norm_loss_sum:", norm_loss_sum)
-                print("norm range, min {}, max {}".format(torch.min(norm_output['pred']), torch.max(norm_output['pred'])))
                 
-                loss_sum = norm_loss_sum + loss_sum
+                weighted_loss_norm = norm_loss_sum * (args.normal_loss_weight if loss_sum.item() / loader_train.batch_size < 0.031 else 0)
+                print("Depth loss: {}, normal loss: {}".format(loss_sum.item() / loader_train.batch_size, weighted_loss_norm.item() / loader_train.batch_size))
+                loss_sum = weighted_loss_norm + loss_sum
                 
 
             # Divide by batch size
@@ -350,11 +366,13 @@ def train(gpu, args):
                 cv2.imwrite(os.path.join(folder_name, "gt.png"), gt)
                 cv2.imwrite(os.path.join(folder_name, "norm_gt.png"), norm_gt)
                 cv2.imwrite(os.path.join(folder_name, "norm_pred.png"), norm_pred)
+                cv2.imwrite(os.path.join(folder_name, "depth_pred.png"), (output["pred"][rand_idx].detach().cpu().numpy()[0] * 1000.0).astype(np.uint16))
+                cv2.imwrite(os.path.join(folder_name, "depth_gt.png"), (sample["gt"][rand_idx].detach().cpu().numpy()[0] * 1000.0).astype(np.uint16))
 
             for i in range(len(loss.loss_name)):
                 writer_train.add_scalar(
                     loss.loss_name[i], total_losses[i] / len(loader_train), epoch)
-
+                
             writer_train.add_scalar('lr', scheduler.get_last_lr()[0], epoch)
             
             if args.use_norm:

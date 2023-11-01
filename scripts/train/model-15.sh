@@ -10,7 +10,7 @@ python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
                 --gpus 4,5 \
                 --loss 1.0*L1+1.0*L2 \
                 --batch_size 14 \
-                --epochs 100 \
+                --epochs 250 \
                 --log_dir ./experiments/ \
                 --save model-15 \
                 --model PromptFinetuneNorm \
@@ -23,5 +23,6 @@ python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
                 --pretrained_completionformer /root/autodl-tmp/yiming/PDNE/pretrained/comp/NYUv2.pt \
                 --use_pol \
                 --use_norm \
+                --normal_loss_weight 0.0035 \
                 --pol_rep leichenyang-7 \
-                --resume --pretrain /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231028_192905_model-15/model_00010.pt \
+                # --resume --pretrain /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231028_192905_model-15/model_00010.pt \
