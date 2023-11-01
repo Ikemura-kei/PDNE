@@ -579,6 +579,8 @@ def test(args):
         net = CompletionFormerPromptFinetuneV2(args)
     elif args.model == 'PromptFinetuneNorm':
         net = CompletionFormerPromptFinetuneNorm(args)
+    elif args.model == 'PolarNormScratch':
+        net = CompletionFormerPolarNorm(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'PromptFinetune', 'RgbFinetune', 'RGBPromptFinetune', 'RgbScratch'])
 
@@ -613,9 +615,9 @@ def test(args):
         summary_writer = SummaryWriter(log_dir=os.path.join(args.save_dir, 'test', 'logs'))
 
         pretrain_list = open(args.pretrain_list_file, 'r').read().split("\n")
-        num_samples_to_save = 3 if len(pretrain_list) >= 5 else 50
-        if len(pretrain_list) == 1:
-            save_samples = np.arange(len(loader_test))
+        num_samples_to_save = 3 if len(pretrain_list) >= 6 else len(loader_test)
+        if len(pretrain_list) <= 5:
+            save_samples = range(len(loader_test))
         else:
             num_samples_to_save = int(len(loader_test) / 40.0)
             save_samples = np.random.randint(0, len(loader_test), num_samples_to_save)

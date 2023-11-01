@@ -1,0 +1,4 @@
+4 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231031_073145_model-15/model_00004.pt
+24 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231031_073145_model-15/model_00024.pt
+12 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231031_073145_model-15/model_00012.pt
+26 - /root/autodl-tmp/yiming/ikemura_ws/PDNE_NORM_REFINE/PDNE/experiments/231031_073145_model-15/model_00026.pt

@@ -120,7 +120,7 @@ class BackbonePromptFinetuneNorm(nn.Module):
         self.norm_dec1 = conv_bn_relu(64+64, 64, kernel=3, stride=1,
                                      padding=1)
         self.norm_dec0 = conv_bn_relu(64+64, 3, kernel=3, stride=1,
-                                     padding=1, bn=False, relu=True)
+                                     padding=1, bn=False, relu=False)
         
         # Guidance Branch
         # 1/1
@@ -190,7 +190,7 @@ class BackbonePromptFinetuneNorm(nn.Module):
         # Surface Normal Decoding
         norm_fd1 = self.norm_dec1(self._concat(fd2, fe2))
         norm = self.norm_dec0(self._concat(norm_fd1, fe1))
-        # norm = torch.nn.functional.normalize(norm, dim=1)
+        norm = torch.nn.functional.normalize(norm, dim=1)
 
         # Guidance Decoding
         gd_fd1 = self.gd_dec1(self._concat(fd2, fe2))
