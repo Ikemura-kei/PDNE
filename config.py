@@ -177,6 +177,10 @@ parser.add_argument('--use_cosine_loss',
                     action='store_true',
                     default=False,
                     help='whether to use cosine similarity loss for normal supervision')
+parser.add_argument('--adaptive_norm_loss',
+                    action='store_false',
+                    default=True,
+                    help='whether to adaptively use normal supervision')
 parser.add_argument('--l1_weight',
                     type=float,
                     default=1.0)
