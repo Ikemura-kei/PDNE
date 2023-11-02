@@ -39,6 +39,7 @@ from model.completionformer_rgb_prompt_finetune.completionformer_rgb_prompt_fine
 from model.completionformer_prompt_finetune_norm.completionformer_prompt_finetune_norm import CompletionFormerPromptFinetuneNorm
 from model.completionformer_finetune_norm_direct.completionformer_finetune_norm_direct import CompletionFormerFinetuneNormDirect 
 from model.normal_depth_branching.normal_depth_branching import NormalDepthBranching
+from model.parida_et_al.networks import ParidaEtAl
 
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
@@ -106,7 +107,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10009',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10005',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -149,6 +150,8 @@ def train(gpu, args):
         net = CompletionFormerFinetuneNormDirect(args)
     elif args.model == 'NormalDepthBranching':
         net = NormalDepthBranching(args)
+    elif args.model == 'ParidaEtAl':
+        net = ParidaEtAl(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'PromptFinetuneNorm'])
 
@@ -342,26 +345,42 @@ def train(gpu, args):
                     vis = cv2.cvtColor(vis, cv2.COLOR_RGB2BGR)
                     return vis
 
+                def attn_to_colormap(attn):
+                    npy_attn = attn.detach().cpu().numpy()[0]
+                    vis = (npy_attn * 255).astype(np.uint8)
+                    return vis
+
                 out = depth_to_colormap(output["pred"][rand_idx], 2.6)
                 gt = depth_to_colormap(sample["gt"][rand_idx], 2.6)
                 sparse = depth_to_colormap(sample["dep"][rand_idx], 2.6)
-                norm_gt = norm_to_colormap(sample["norm"][rand_idx])
-                print("min norm: {}, max norm: {}".format(torch.min(output["norm"]), torch.max(output["norm"])))
-                norm_pred = norm_to_colormap(output["norm"][rand_idx])
+                
+                if args.use_norm:
+                    norm_gt = norm_to_colormap(sample["norm"][rand_idx])
+                    print("min norm: {}, max norm: {}".format(torch.min(output["norm"]), torch.max(output["norm"])))
+                    norm_pred = norm_to_colormap(output["norm"][rand_idx])
                 
                 # if args.model == 'NormalDepthBranching':
                 #     out1 = depth_to_colormap(output["pred_1"][rand_idx], 2.6)
                 #     out2 = depth_to_colormap(output["shape_focused_depth"][rand_idx], 2.6)
                 #     cv2.imwrite(os.path.join(folder_name, "pred_1.png"), out1)
                 #     cv2.imwrite(os.path.join(folder_name, "shape_focused_depth.png"), out2)
-
+                
+                if args.model == 'ParidaEtAl':
+                    pol_depth = depth_to_colormap(output['pol_depth'][rand_idx], 2.6)
+                    rgb_depth = depth_to_colormap(output['rgb_depth'][rand_idx], 2.6)
+                    attention = attn_to_colormap(output['attn'][rand_idx])
+                    cv2.imwrite(os.path.join(folder_name, "pol_depth.png"), pol_depth)
+                    cv2.imwrite(os.path.join(folder_name, "rgb_depth.png"), rgb_depth)
+                    cv2.imwrite(os.path.join(folder_name, "attention.png"), attention)
+                    
                 cv2.imwrite(os.path.join(folder_name, "out.png"), out)
                 cv2.imwrite(os.path.join(folder_name, "sparse.png"), sparse)
                 cv2.imwrite(os.path.join(folder_name, "gt.png"), gt)
-                cv2.imwrite(os.path.join(folder_name, "norm_gt.png"), norm_gt)
-                cv2.imwrite(os.path.join(folder_name, "norm_pred.png"), norm_pred)
                 cv2.imwrite(os.path.join(folder_name, "depth_pred.png"), (output["pred"][rand_idx].detach().cpu().numpy()[0] * 1000.0).astype(np.uint16))
                 cv2.imwrite(os.path.join(folder_name, "depth_gt.png"), (sample["gt"][rand_idx].detach().cpu().numpy()[0] * 1000.0).astype(np.uint16))
+                if args.use_norm:
+                    cv2.imwrite(os.path.join(folder_name, "norm_gt.png"), norm_gt)
+                    cv2.imwrite(os.path.join(folder_name, "norm_pred.png"), norm_pred)
 
             for i in range(len(loss.loss_name)):
                 writer_train.add_scalar(
