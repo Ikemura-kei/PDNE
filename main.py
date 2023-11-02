@@ -52,6 +52,7 @@ from model.completionformer_rgb_scratch.completionformer_rgb_scratch import Comp
 from model.completionformer_prompt_finetune_norm.completionformer_prompt_finetune_norm import CompletionFormerPromptFinetuneNorm
 from model.completionformer_polar_norm.completionformer_polar_norm import CompletionFormerPolarNorm
 from model.completionformer_finetune_norm_direct.completionformer_finetune_norm_direct import CompletionFormerFinetuneNormDirect 
+from model.normal_depth_branching.normal_depth_branching import NormalDepthBranching
 
 from model.completionformer_early_fusion.completionformer_early_fusion import CompletionFormerEarlyFusion
 from model.completionformer_prompt_finetune_v2.completionformer_prompt_finetune_v2 import CompletionFormerPromptFinetuneV2
@@ -99,6 +100,8 @@ def check_args(args):
             new_args.resume = args.resume
             new_args.layer0=False
             new_args.save_freq = 2
+            new_args.batch_size = args.batch_size
+            new_args.normal_loss_weight = args.normal_loss_weight
 
     camera_matrix_txt = open(args.camera_matrix_file, 'r').read().split("\n")[:-1]
     camera_matrix = []
@@ -120,7 +123,7 @@ def train(gpu, args):
 
     # Initialize workers
     # NOTE : the worker with gpu=0 will do logging
-    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10001',
+    dist.init_process_group(backend='nccl', init_method='tcp://localhost:10009',
                             world_size=args.num_gpus, rank=gpu)
     torch.cuda.set_device(gpu)
 
@@ -171,6 +174,8 @@ def train(gpu, args):
         net = CompletionFormerPolarNorm(args)
     elif args.model == 'CompletionFormerFinetuneNormDirect':
         net = CompletionFormerFinetuneNormDirect(args)
+    elif args.model == 'NormalDepthBranching':
+        net = NormalDepthBranching(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'PromptFintune', 'VPT-V2', 'RGBPromptFinetune', 'PromptFinetuneNorm'])
 
@@ -194,6 +199,12 @@ def train(gpu, args):
     # Loss
     loss = L1L2Loss(args)
     loss.cuda(gpu)
+    
+    # if args.model == 'NormalDepthBranching':
+    #     shape_depth_loss = L1L2Loss(args)
+    #     shape_depth_loss.cuda(gpu)
+    #     init_depth_loss = L1L2Loss(args)
+    #     init_depth_loss.cuda(gpu)
     
     if args.use_norm:
         norm_loss = torch.nn.L1Loss(reduction='none') if not args.use_cosine_loss else torch.nn.CosineSimilarity(dim=1)
@@ -300,10 +311,21 @@ def train(gpu, args):
                 # print(loss_raw.shape)
                 norm_loss_sum = torch.sum(torch.mean(loss_raw, dim=(1,2)))
                 
-                weighted_loss_norm = norm_loss_sum * (args.normal_loss_weight if loss_sum.item() / loader_train.batch_size < 0.031 else 0)
+                if args.adaptive_norm_loss:
+                    weighted_loss_norm = norm_loss_sum * (args.normal_loss_weight if loss_sum.item() / loader_train.batch_size < 0.031 else 0)
+                else:
+                    weighted_loss_norm = norm_loss_sum * args.normal_loss_weight
                 print("Depth loss: {}, normal loss: {}".format(loss_sum.item() / loader_train.batch_size, weighted_loss_norm.item() / loader_train.batch_size))
                 loss_sum = weighted_loss_norm + loss_sum
                 
+            # if args.model == 'NormalDepthBranching':
+            #     shape_depth_prediction = {'pred': output['shape_focused_depth']  * sample['net_mask']}
+            #     init_depth_prediction = {'pred': output['pred_1']  * sample['net_mask']}
+            #     shape_depth_loss_sum, shape_depth_loss_val = shape_depth_loss(sample, shape_depth_prediction)
+            #     init_depth_loss_sum, init_depth_loss_val = init_depth_loss(sample, init_depth_prediction)
+            #     loss_sum = loss_sum + shape_depth_loss_sum + init_depth_loss_sum
+                
+            loss_sum_norm=0
 
             # Divide by batch size
             loss_sum = loss_sum / loader_train.batch_size
@@ -360,6 +382,12 @@ def train(gpu, args):
                 norm_gt = norm_to_colormap(sample["norm"][rand_idx])
                 print("min norm: {}, max norm: {}".format(torch.min(output["norm"]), torch.max(output["norm"])))
                 norm_pred = norm_to_colormap(output["norm"][rand_idx])
+                
+                # if args.model == 'NormalDepthBranching':
+                #     out1 = depth_to_colormap(output["pred_1"][rand_idx], 2.6)
+                #     out2 = depth_to_colormap(output["shape_focused_depth"][rand_idx], 2.6)
+                #     cv2.imwrite(os.path.join(folder_name, "pred_1.png"), out1)
+                #     cv2.imwrite(os.path.join(folder_name, "shape_focused_depth.png"), out2)
 
                 cv2.imwrite(os.path.join(folder_name, "out.png"), out)
                 cv2.imwrite(os.path.join(folder_name, "sparse.png"), sparse)
@@ -601,6 +629,8 @@ def test(args):
         net = CompletionFormerPolarNorm(args)
     elif args.model == 'CompletionFormerFinetuneNormDirect':
         net = CompletionFormerFinetuneNormDirect(args)
+    elif args.model == 'NormalDepthBranching':
+        net = NormalDepthBranching(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'PromptFinetune', 'RgbFinetune', 'RGBPromptFinetune', 'RgbScratch'])
 
