@@ -1,0 +1,9 @@
+38 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-26/PDNE/experiments/231101_082211_model-26/model_00038.pt
+40 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-26/PDNE/experiments/231101_082211_model-26/model_00040.pt
+42 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-26/PDNE/experiments/231101_082211_model-26/model_00042.pt
+44 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-26/PDNE/experiments/231101_082211_model-26/model_00044.pt
+46 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-26/PDNE/experiments/231101_082211_model-26/model_00046.pt
+48 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-26/PDNE/experiments/231101_082211_model-26/model_00048.pt
+50 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-26/PDNE/experiments/231101_082211_model-26/model_00050.pt
+52 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-26/PDNE/experiments/231101_082211_model-26/model_00052.pt
+54 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-26/PDNE/experiments/231101_082211_model-26/model_00054.pt

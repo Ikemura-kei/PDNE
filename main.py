@@ -599,6 +599,8 @@ def test(args):
         net = CompletionFormerPromptFinetuneNorm(args)
     elif args.model == 'PolarNormScratch':
         net = CompletionFormerPolarNorm(args)
+    elif args.model == 'CompletionFormerFinetuneNormDirect':
+        net = CompletionFormerFinetuneNormDirect(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'PromptFinetune', 'RgbFinetune', 'RGBPromptFinetune', 'RgbScratch'])
 
