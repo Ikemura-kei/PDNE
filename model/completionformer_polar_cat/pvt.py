@@ -181,6 +181,8 @@ class PyramidVisionTransformer(nn.Module):
         net = get_resnet34(pretrained=True)
         setattr(self, "embed_layer1", net.layer1)
         setattr(self, "embed_layer2", net.layer2)
+        for params in self.embed_layer1.parameters():
+            params.requires_grad = False
         del net
         in_chans = 128
 
@@ -243,11 +245,14 @@ class PyramidVisionTransformer(nn.Module):
         B = x.shape[0]
 
         x = getattr(self, 'embed_layer1')(x)
-        print("--> Is resnet layer1 NaN? {}".format(torch.any(torch.isnan(x))))
+        # print("--> Is resnet layer1 NaN? {}".format(torch.any(torch.isnan(x))))
         outs.append(x)
+        self.embed_layer2.eval()
         x = getattr(self, 'embed_layer2')(x)
-        print("--> Is resnet layer2 NaN? {}".format(torch.any(torch.isnan(x))))
+        # print("--> Is resnet layer2 NaN? {}".format(torch.any(torch.isnan(x))))
         outs.append(x)
+        if (torch.any(torch.isnan(x))):
+            exit()
 
 
         for i in range(self.num_stages):
@@ -255,22 +260,22 @@ class PyramidVisionTransformer(nn.Module):
             pos_embed = getattr(self, f"pos_embed{i + 1}")
             pos_drop = getattr(self, f"pos_drop{i + 1}")
             block = getattr(self, f"block{i + 1}")
-            print("--> Is beginning x{} containing NaN? {}".format(i+1, torch.any(torch.isnan(x))))
+            # print("--> Is beginning x{} containing NaN? {}".format(i+1, torch.any(torch.isnan(x))))
 
             x, (H, W) = patch_embed(x)
             if i == self.num_stages - 1:
                 pos_embed = self._get_pos_embed(pos_embed[:, 1:], patch_embed, H, W)
             else:
                 pos_embed = self._get_pos_embed(pos_embed, patch_embed, H, W)
-            print("--> Is path_embedded x{} containing NaN? {}".format(i+1, torch.any(torch.isnan(x))))
-            print("--> Is pos_embed{} containing NaN? {}".format(i+1, torch.any(torch.isnan(pos_embed))))
+            # print("--> Is path_embedded x{} containing NaN? {}".format(i+1, torch.any(torch.isnan(x))))
+            # print("--> Is pos_embed{} containing NaN? {}".format(i+1, torch.any(torch.isnan(pos_embed))))
             x = pos_drop(x + pos_embed)
-            print("--> Is pos_dropped x{} containing NaN? {}".format(i+1, torch.any(torch.isnan(x))))
+            # print("--> Is pos_dropped x{} containing NaN? {}".format(i+1, torch.any(torch.isnan(x))))
 
             j=0
             for blk in block:
                 x = blk(x, H, W)
-                print("--> Is blk x{}_{} containing NaN? {}".format(i+1, j+1, torch.any(torch.isnan(x))))
+                # print("--> Is blk x{}_{} containing NaN? {}".format(i+1, j+1, torch.any(torch.isnan(x))))
                 j += 1
 
             x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
