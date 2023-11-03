@@ -1,2 +1,4 @@
-16 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-27/PDNE/experiments/231102_145802_model-27/model_00016.pt
-18 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-27/PDNE/experiments/231102_145802_model-27/model_00018.pt
+2 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-27/PDNE/experiments/231103_010617_model-27/model_00002.pt
+4 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-27/PDNE/experiments/231103_010617_model-27/model_00004.pt
+6 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-27/PDNE/experiments/231103_010617_model-27/model_00006.pt
+8 - /root/autodl-tmp/yiming/ikemura_ws/MODEL-27/PDNE/experiments/231103_010617_model-27/model_00008.pt

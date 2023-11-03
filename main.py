@@ -570,6 +570,12 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
                 vis = ((npy_norm + 1) / 2 * 255).astype(np.uint8)
                 vis = cv2.cvtColor(vis, cv2.COLOR_RGB2BGR)
                 return vis
+            
+            def attn_to_colormap(attn):
+                npy_attn = attn.detach().cpu().numpy()[0][0]
+                vis = (npy_attn * 255).astype(np.uint8)
+                return vis
+                
 
             gt_vis = depth2vis(gt, 2.15)
             dep_vis = depth2vis(dep, 2.15)
@@ -595,6 +601,14 @@ def test_one_model(args, net, loader_test, save_samples, epoch_idx=0, summary_wr
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_pred.png'.format(batch)), pred_vis)
             cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_dep.png'.format(batch)), dep_vis)
     
+            if args.model == 'ParidaEtAl':
+                pol_depth = depth2vis(output['pol_depth'], 2.15)
+                rgb_depth = depth2vis(output['rgb_depth'], 2.15)
+                attention = attn_to_colormap(output['attn'])
+                cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_pol_depth.png'.format(batch)), pol_depth)
+                cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_rgb_depth.png'.format(batch)), rgb_depth)
+                cv2.imwrite(os.path.join(vis_dir, 'e{}'.format(epoch_idx), 's{}_attention.png'.format(batch)), attention)
+                
     pbar.close()
 
     t_avg = t_total / num_sample
@@ -650,6 +664,8 @@ def test(args):
         net = CompletionFormerFinetuneNormDirect(args)
     elif args.model == 'NormalDepthBranching':
         net = NormalDepthBranching(args)
+    elif args.model == 'ParidaEtAl':
+        net = ParidaEtAl(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1', 'CompletionFormerFreezed', 'VPT-V2', 'PromptFinetune', 'RgbFinetune', 'RGBPromptFinetune', 'RgbScratch'])
 
