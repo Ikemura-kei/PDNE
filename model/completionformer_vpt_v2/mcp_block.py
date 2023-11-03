@@ -38,6 +38,7 @@ class MCPBlock(nn.Module):
         self.conv1x1 = nn.Conv2d(in_channels=hidden_dim, out_channels=in_dim1, kernel_size=1, stride=1, padding=0)
 
     def forward(self, x, complementary):
+        # x0 is the Hl, x1 is the Pl
         x0 = x.contiguous()
         x0 = self.conv0_0(x0)
 
