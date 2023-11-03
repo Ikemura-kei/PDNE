@@ -42,7 +42,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
 os.environ["MASTER_ADDR"] = args_config.address
 os.environ["MASTER_PORT"] = args_config.port
 
-torch.autograd.set_detect_anomaly(True)
 
 # Multi-GPU and Mixed precision supports
 # NOTE : Only 1 process per GPU is supported now
