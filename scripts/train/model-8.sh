@@ -18,5 +18,5 @@ python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
                 --save_full \
                 --warm_up \
                 --lr 0.00105 \
-                --resume \
-                --pretrain /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_SCRATCH/PDNE/experiments/231018_021259_model-8/model_00090.pt  
+                # --resume \
+                # --pretrain /root/autodl-tmp/yiming/ikemura_ws/PDNE_RGB_SCRATCH/PDNE/experiments/231018_021259_model-8/model_00090.pt  

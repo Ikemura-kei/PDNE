@@ -181,6 +181,8 @@ class PyramidVisionTransformer(nn.Module):
         net = get_resnet34(pretrained=True)
         setattr(self, "embed_layer1", net.layer1)
         setattr(self, "embed_layer2", net.layer2)
+        for params in self.embed_layer1.parameters():
+            params.requires_grad = False
         del net
         in_chans = 128
 
@@ -244,8 +246,11 @@ class PyramidVisionTransformer(nn.Module):
 
         x = getattr(self, 'embed_layer1')(x)
         outs.append(x)
+        self.embed_layer2.eval()
         x = getattr(self, 'embed_layer2')(x)
         outs.append(x)
+        if (torch.any(torch.isnan(x))):
+            exit()
 
 
         for i in range(self.num_stages):
