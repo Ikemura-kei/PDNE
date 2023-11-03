@@ -98,11 +98,12 @@ class NormalDepthBranching(nn.Module):
     
     def forward(self, x):
         normal_out = self.normal_branch(x)
+        normal_out['normal'].register_hook(lambda grad: print('normal_out', grad)) 
         
         norm_fe1, norm_fe2, norm_fe3, norm_fe4, norm_fe5 = self.normal_encoder(normal_out['normal'])
         
         depth_out = self.depth_branch(x, [norm_fe1, norm_fe2, norm_fe3, norm_fe4, norm_fe5])
-        
+        depth_out['pred'].register_hook(lambda grad: print('depth_out', grad)) 
         depth_out['norm'] = normal_out['normal']
         
         return depth_out

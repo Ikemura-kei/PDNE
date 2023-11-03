@@ -254,12 +254,13 @@ class PyramidVisionTransformer(nn.Module):
         outs.append(x)
         self.embed_layer2.eval()
         x = getattr(self, 'embed_layer2')(x)
+        x.register_hook(lambda grad: print('x after embed 2', grad)) 
         print("Is x2 NaN? {}".format(torch.any(torch.isnan(x))))
         
         outs.append(x)
         
-        if torch.any(torch.isnan(x)):
-            exit()
+        # if torch.any(torch.isnan(x)):
+        #     exit()
 
         for i in range(self.num_stages):
             patch_embed = getattr(self, f"patch_embed{i + 1}")

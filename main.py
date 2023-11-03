@@ -221,7 +221,8 @@ def train(gpu, args):
 
     if args.warm_up:
         warm_up_cnt = 0.0
-        warm_up_max_cnt = len(loader_train)+1.0
+        WARM_UP_EPOCH = 5
+        warm_up_max_cnt = WARM_UP_EPOCH * len(loader_train)+1.0
 
     for epoch in range(init_epoch, args.epochs+1):
         # Train
@@ -252,13 +253,16 @@ def train(gpu, args):
 
             sample["input"] = sample["rgb"]
 
-            if epoch == 1 and args.warm_up:
+            if epoch <= WARM_UP_EPOCH and args.warm_up:
                 warm_up_cnt += 1
 
                 for param_group in optimizer.param_groups:
                     lr_warm_up = param_group['initial_lr'] \
                         * warm_up_cnt / warm_up_max_cnt
                     param_group['lr'] = lr_warm_up
+                    
+            for param_group in optimizer.param_groups:
+                print('lr:', param_group['lr'])
 
             optimizer.zero_grad()
 
@@ -266,6 +270,10 @@ def train(gpu, args):
             
             output['pred'] = output['pred']  * sample['net_mask']
             sample['gt'] = sample['gt'] 
+            
+            if torch.any(torch.isnan(output['pred'])):
+                print('!!!!!!!!!!!!!!!!! NaN occurred, skip')
+                continue
 
             loss_sum, loss_val = loss(sample, output)
             
@@ -305,7 +313,7 @@ def train(gpu, args):
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
                 
-            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=4, norm_type=2)
+            torch.nn.utils.clip_grad_norm_(parameters=net.parameters(), max_norm=3, norm_type=2)
             optimizer.step()
 
             if gpu == 0:

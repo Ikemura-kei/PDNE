@@ -163,6 +163,7 @@ class BackboneFinetuneNormDirect(nn.Module):
             # self.conv1_rgb.eval()
             # print("Is rgb NaN? {}".format(torch.any(torch.isnan(rgb))))
             fe1_rgb = self.conv1_rgb(rgb)
+            fe1_rgb.register_hook(lambda grad: print("fe1_rgb", grad)) 
             # print("Is fe1_rgb NaN? {}".format(torch.any(torch.isnan(fe1_rgb))))
 
             if self.args.pol_rep == 'grayscale-4':
@@ -173,10 +174,12 @@ class BackboneFinetuneNormDirect(nn.Module):
             elif self.args.pol_rep == 'leichenyang-7':
                 fe1_pol_for_rgb = self.conv1_pol_for_rgb(pol)
                 # print("Is fe1_pol_for_rgb NaN? {}".format(torch.any(torch.isnan(fe1_pol_for_rgb))))
-
+            fe1_pol_for_rgb.register_hook(lambda grad: print("fe1_pol_for_rgb", grad)) 
             fe1_rgb = fe1_rgb + fe1_pol_for_rgb
             # print("Is fe1_rgb post NaN? {}".format(torch.any(torch.isnan(fe1_rgb))))
             fe1_dep = self.conv1_dep(depth)
+            fe1_dep.register_hook(lambda grad: print("fe1_dep", grad)) 
+
             # print("Is fe1_dep NaN? {}".format(torch.any(torch.isnan(fe1_dep))))
 
             fe1 = torch.cat((fe1_rgb, fe1_dep), dim=1)
