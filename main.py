@@ -48,7 +48,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
 os.environ["MASTER_ADDR"] = args_config.address
 os.environ["MASTER_PORT"] = args_config.port
 
-torch.autograd.set_detect_anomaly(True)
+# torch.autograd.set_detect_anomaly(True)
 
 # Multi-GPU and Mixed precision supports
 # NOTE : Only 1 process per GPU is supported now
@@ -100,7 +100,7 @@ def train(gpu, args):
 
 
     # Prepare dataset
-    dataset = HammerDataset(args, "train") if args.model != 'POLAR-CAT' else HammerDatasetOld(args, "train")
+    dataset = HammerDataset(args, "train")
 
     sampler_train = DistributedSampler(
         dataset, num_replicas=args.num_gpus, rank=gpu)
@@ -236,7 +236,7 @@ def train(gpu, args):
 
             optimizer.zero_grad()
 
-            net.eval()
+            # net.eval()
             # with torch.no_grad():
             output = net(sample)
             
@@ -253,7 +253,7 @@ def train(gpu, args):
             loss_sum = loss_sum / loader_train.batch_size
             loss_val = loss_val / loader_train.batch_size
             # print("--> Loss sum {}".format(loss_sum))
-            print("--> Loss val {}".format(loss_val))
+            # print("--> Loss val {}".format(loss_val))
 
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
@@ -288,7 +288,7 @@ def train(gpu, args):
                     return vis
 
                 out = depth_to_colormap(output["pred"][rand_idx], 2.6)
-                print("--> Output max {} min {}".format(torch.max(output["pred"][rand_idx]), torch.min(output["pred"][rand_idx])))
+                # print("--> Output max {} min {}".format(torch.max(output["pred"][rand_idx]), torch.min(output["pred"][rand_idx])))
                 gt = depth_to_colormap(sample["gt"][rand_idx], 2.6)
                 sparse = depth_to_colormap(sample["dep"][rand_idx], 2.6)
 

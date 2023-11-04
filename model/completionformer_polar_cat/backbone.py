@@ -166,12 +166,12 @@ class Backbone(nn.Module):
             raise TypeError(self.mode)
         
         is_fe1_nan = torch.any(torch.isnan(fe1))
-        print("--> Does fe1 contain NaN? {}".format(is_fe1_nan))
+        # print("--> Does fe1 contain NaN? {}".format(is_fe1_nan))
 
         fe2, fe3, fe4, fe5, fe6, fe7 = self.former(fe1)
         for j, fe in enumerate([fe2, fe3, fe4, fe5, fe6, fe7]):
             is_fe_nan = torch.any(torch.isnan(fe))
-            print("--> Does fe{} contain NaN? {}".format(str(j+2), is_fe_nan))
+            # print("--> Does fe{} contain NaN? {}".format(str(j+2), is_fe_nan))
 
         # Shared Decoding
         fd6 = self.dec6(fe7)
@@ -182,7 +182,7 @@ class Backbone(nn.Module):
 
         # Init Depth Decoding
         dep_fd1 = self.dep_dec1(self._concat(fd2, fe2))
-        print("--> Does dep_fd1 contain NaN? {}".format(torch.any(torch.isnan(dep_fd1))))
+        # print("--> Does dep_fd1 contain NaN? {}".format(torch.any(torch.isnan(dep_fd1))))
         init_depth = self.dep_dec0(self._concat(dep_fd1, fe1))
 
         # Guidance Decoding

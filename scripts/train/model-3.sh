@@ -19,6 +19,7 @@ python main.py --dir_data /root/autodl-tmp/yiming/datasets/polar_hammer \
                 --warm_up \
                 --lr 0.001005 \
                 --use_pol \
-                --pol_rep grayscale-4 \
+                --pol_rep leichenyang-7 \
+                --data_percentage 1.0 \
                 # --resume \
                 # --pretrain /root/autodl-tmp/yiming/ikemura_ws/PDNE_CONCAT/PDNE/experiments/230919_061840_model-3/model_00198.pt \
