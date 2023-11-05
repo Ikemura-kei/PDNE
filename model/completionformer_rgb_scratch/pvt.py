@@ -181,7 +181,7 @@ class PyramidVisionTransformer(nn.Module):
         net = get_resnet34(pretrained=True)
         setattr(self, "embed_layer1", net.layer1)
         setattr(self, "embed_layer2", net.layer2)
-        for params in self.embed_layer1.parameters():
+        for params in self.embed_layer2.parameters():
             params.requires_grad = False
         del net
         in_chans = 128
