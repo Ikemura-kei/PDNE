@@ -34,13 +34,14 @@ from model.completionformer_original.completionformer import CompletionFormer
 from model.completionformer_vpt_v1.completionformer_vpt_v1 import CompletionFormerVPTV1
 from model.completionformer_vpt_v2.completionformer_vpt_v2 import CompletionFormerVPTV2
 from model.completionformer_vpt_v2.completionformer_vpt_v2_1 import CompletionFormerVPTV2_1
+from model.completionformer_vipt.completionformer_vipt import CompletionFormerViPT
 from summary.cfsummary import CompletionFormerSummary
 from metric.cfmetric import CompletionFormerMetric
 os.environ["CUDA_VISIBLE_DEVICES"] = args_config.gpus
 os.environ["MASTER_ADDR"] = args_config.address
 os.environ["MASTER_PORT"] = args_config.port
 
-torch.autograd.set_detect_anomaly(True)
+# torch.autograd.set_detect_anomaly(True)
 
 # Multi-GPU and Mixed precision supports
 # NOTE : Only 1 process per GPU is supported now
@@ -119,6 +120,8 @@ def train(gpu, args):
         net = CompletionFormerVPTV1(args)
     elif args.model == 'VPT-V2':
         net = CompletionFormerVPTV2_1(args)
+    elif args.model == 'CompletionFormerViPT':
+        net = CompletionFormerViPT(args)
     else:
         raise TypeError(args.model, ['CompletionFormer', 'PDNE', 'VPT-V1'])
 
@@ -241,7 +244,7 @@ def train(gpu, args):
             loss_sum = loss_sum / loader_train.batch_size
             loss_val = loss_val / loader_train.batch_size
             # print("--> Loss sum {}".format(loss_sum))
-            print("--> Loss val {}".format(loss_val))
+            # print("--> Loss val {}".format(loss_val))
 
             with amp.scale_loss(loss_sum, optimizer) as scaled_loss:
                 scaled_loss.backward()
